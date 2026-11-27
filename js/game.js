@@ -1,5 +1,6 @@
 import { createAction } from "./action.js";
 import { createAchievements } from "./achievements.js";
+import { createJoystick } from "./joystick.js";
 import { createRenderer, movePlayer, nearestInteraction, noteSpots, player, stations } from "./room.js";
 import { drawWeaponIcon } from "./sprites.js";
 import { shuffleSystems } from "./systems.js";
@@ -11,6 +12,7 @@ const byId = id => document.getElementById(id);
 const canvas = byId("room");
 const interactButton = byId("interact");
 const interactText = interactButton.querySelector("span");
+const controlsDialog = byId("controls");
 const noteDialog = byId("note");
 const noteList = byId("tasks");
 const hintPanel = byId("station-hint");
@@ -30,6 +32,7 @@ const notes = [note, ...stations.map((station, index) => ({
 }))];
 
 const renderer = createRenderer(canvas);
+const joystick = createJoystick(canvas, byId("move-joystick"));
 const achievements = createAchievements([...tasks, finaleAchievement], () => canvas.focus({ preventScroll: true }));
 const action = createAction(showNotice, () => achievements.unlock(finaleAchievement));
 action.state.medal = achievements.has(finaleAchievement.event);
@@ -115,7 +118,6 @@ const taskRows = new Map(tasks.map(task => {
 }));
 
 const keys = new Set();
-const directions = new Map();
 const movement = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowLeft", "ArrowDown", "ArrowRight"]);
 let nearby;
 let previousTime;
@@ -125,8 +127,12 @@ let canvasPressArmed = false;
 let shotRequest;
 let interactionKeyHeld = false;
 
+function gamePaused() {
+  return controlsDialog.open || terminal.isOpen || noteDialog.open || achievements.isOpen;
+}
+
 function interact() {
-  if (action.state.dead || terminal.isOpen || noteDialog.open || achievements.isOpen) return false;
+  if (action.state.dead || gamePaused()) return false;
   const target = nearestInteraction(notes);
   if (!target) return false;
 
@@ -139,7 +145,6 @@ function interact() {
 function openNote(target) {
   const hint = target.task;
   noteList.hidden = Boolean(hint);
-  byId("note-controls").hidden = Boolean(hint);
   hintPanel.hidden = !hint;
   byId("note-title").textContent = hint ? "Подсказка для " + target.station.id : "Список дел";
   if (hint) {
@@ -161,7 +166,7 @@ function toggleAchievements() {
 
 function resetInput() {
   keys.clear();
-  directions.clear();
+  joystick.reset();
   stopShooting();
   shotRequest = undefined;
   interactionKeyHeld = false;
@@ -188,6 +193,8 @@ function updateInteraction(paused) {
 }
 
 interactButton.addEventListener("click", interact);
+byId("start-game").addEventListener("click", () => controlsDialog.close());
+controlsDialog.addEventListener("close", () => canvas.focus({ preventScroll: true }));
 byId("open-achievements").addEventListener("click", toggleAchievements);
 byId("close-note").addEventListener("click", closeNote);
 noteDialog.addEventListener("cancel", event => {
@@ -204,7 +211,14 @@ window.addEventListener("keydown", event => {
     terminal.handleKey(event);
     return;
   }
-  if (noteDialog.open || event.altKey || event.ctrlKey || event.metaKey) return;
+  if (controlsDialog.open || event.altKey || event.ctrlKey || event.metaKey) return;
+  if (noteDialog.open) {
+    if (event.code === "KeyE") {
+      event.preventDefault();
+      if (!event.repeat) closeNote();
+    }
+    return;
+  }
   if (event.code === "KeyO") {
     event.preventDefault();
     if (!event.repeat) toggleAchievements();
@@ -237,22 +251,10 @@ document.addEventListener("visibilitychange", () => {
 });
 
 byId("game").addEventListener("wheel", event => {
-  if (!action.state.armed || terminal.isOpen || noteDialog.open || achievements.isOpen || event.ctrlKey || !event.deltaY) return;
+  if (!action.state.armed || gamePaused() || event.ctrlKey || !event.deltaY) return;
   event.preventDefault();
   action.cycleWeapon(event.deltaY);
 }, { passive: false });
-
-for (const button of document.querySelectorAll("[data-direction]")) {
-  button.addEventListener("pointerdown", event => {
-    if (event.button !== 0 || action.state.dead) return;
-    event.preventDefault();
-    button.setPointerCapture(event.pointerId);
-    directions.set(event.pointerId, button.dataset.direction);
-  });
-  for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) {
-    button.addEventListener(type, event => directions.delete(event.pointerId));
-  }
-}
 
 function aim(event) {
   if (event.pointerType === "touch" && event.pointerId !== shootingPointer) return;
@@ -266,10 +268,13 @@ function stopShooting() {
   if (pointer?.type === "touch") pointer = undefined;
 }
 
-canvas.addEventListener("pointermove", aim);
+canvas.addEventListener("pointermove", event => {
+  if (!joystick.move(event)) aim(event);
+});
 canvas.addEventListener("pointerdown", event => {
-  if (event.button !== 0) return;
+  if (event.button !== 0 || action.state.dead || gamePaused()) return;
   canvasPressArmed = action.state.armed;
+  if (joystick.start(event)) return;
   if (!canvasPressArmed || shootingPointer !== undefined) return;
   shootingPointer = event.pointerId;
   canvas.setPointerCapture(event.pointerId);
@@ -278,6 +283,8 @@ canvas.addEventListener("pointerdown", event => {
   event.preventDefault();
 });
 function releaseAim(event) {
+  if (joystick.release(event)) return;
+  if (event.pointerType === "touch" && event.pointerId !== shootingPointer) return;
   if (event.pointerId !== shootingPointer && event.type !== "pointerleave") return;
   if (event.type !== "pointerleave") shootingPointer = undefined;
   if (event.pointerType === "touch" || event.type === "pointerleave") pointer = undefined;
@@ -286,7 +293,7 @@ for (const type of ["pointerup", "pointercancel", "pointerleave", "lostpointerca
   canvas.addEventListener(type, releaseAim);
 }
 canvas.addEventListener("click", event => {
-  if (canvasPressArmed || action.state.armed || !nearby) return;
+  if (canvasPressArmed || action.state.armed || !nearby || joystick.blocksClick(event)) return;
   const point = renderer.worldPoint(event.clientX, event.clientY);
   if (Math.abs(point.x - nearby.x) < 34 && Math.abs(point.y - nearby.y) < 33) interact();
 });
@@ -295,11 +302,10 @@ function frame(time) {
   const frameElapsed = previousTime === undefined ? 0 : (time - previousTime) / 1000;
   const elapsed = Math.min(frameElapsed, 0.033);
   previousTime = time;
-  const paused = terminal.isOpen || noteDialog.open || achievements.isOpen;
+  const paused = gamePaused();
   const canMove = !paused && !action.state.dead;
-  const pressed = new Set([...keys, ...directions.values()]);
-  const dx = Number(pressed.has("KeyD") || pressed.has("ArrowRight")) - Number(pressed.has("KeyA") || pressed.has("ArrowLeft"));
-  const dy = Number(pressed.has("KeyS") || pressed.has("ArrowDown")) - Number(pressed.has("KeyW") || pressed.has("ArrowUp"));
+  const dx = joystick.x + Number(keys.has("KeyD") || keys.has("ArrowRight")) - Number(keys.has("KeyA") || keys.has("ArrowLeft"));
+  const dy = joystick.y + Number(keys.has("KeyS") || keys.has("ArrowDown")) - Number(keys.has("KeyW") || keys.has("ArrowUp"));
   movePlayer(canMove ? dx : 0, canMove ? dy : 0, elapsed);
   renderer.follow(elapsed, false);
   const target = pointer ?? shotRequest;
@@ -314,6 +320,7 @@ function frame(time) {
   const respawned = !paused && action.update(elapsed, shootingPointer !== undefined, Boolean(shotRequest), frameElapsed);
   shotRequest = undefined;
   if (!action.state.armed) stopShooting();
+  if (action.state.dead) joystick.reset();
   if (respawned) {
     resetInput();
     renderer.follow(elapsed, true);
@@ -329,4 +336,5 @@ function frame(time) {
   requestAnimationFrame(frame);
 }
 
+controlsDialog.showModal();
 requestAnimationFrame(frame);

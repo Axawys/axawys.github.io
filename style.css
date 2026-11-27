@@ -26,7 +26,8 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 .interact kbd { min-width: 21px; min-height: 20px; color: #ddf8d9; border-color: #547863; }
 [hidden] { display: none !important; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.touch-controls { display: none; }
+.move-joystick { position: absolute; z-index: 3; display: grid; place-items: center; width: 100px; height: 100px; pointer-events: none; transform: translate(-50%, -50%); border: 2px solid #a5cea2b3; border-radius: 50%; background: #11251b9c; box-shadow: inset 0 0 0 4px #1326198c, 0 2px #1019139e; }
+.move-joystick span { width: 30px; height: 30px; border: 2px solid #cef1c8; border-radius: 50%; background: #679376d9; box-shadow: inset 0 -4px #385b458c; }
 .open-achievements { display: none; position: absolute; right: max(12px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom)); z-index: 3; min-height: 40px; padding: 6px 11px; border: 1px solid #8a7a53; background: #302d21; color: #f7df9d; box-shadow: inset 0 -3px #222118; font-size: .8rem; font-weight: 700; }
 .open-achievements:hover { background: #4b4129; }
 #death { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; color: #ffe5d6; background: radial-gradient(ellipse at center, transparent 25%, #5c1d265c); text-shadow: 2px 3px #3c1d21; font: 700 clamp(1.4rem, 4vw, 2.2rem) var(--mono); }
@@ -56,8 +57,18 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
   @keyframes achievement-enter { from { opacity: 0; transform: translateX(8px); } }
 }
 
-.achievement-wall { width: min(580px, calc(100% - 24px)); max-height: calc(100% - 24px); padding: clamp(14px, 4vw, 25px); border: 2px solid #6b7d66; color: #edf2e6; background: #23342a; box-shadow: inset 0 3px #4e654f, inset 0 -5px #18271f, 0 5px #111c17; }
-.achievement-wall::backdrop { background: #080f0bd0; }
+.achievement-wall, .controls-dialog { width: min(580px, calc(100% - 24px)); max-height: calc(100% - 24px); padding: clamp(14px, 4vw, 25px); border: 2px solid #6b7d66; color: #edf2e6; background: #23342a; box-shadow: inset 0 3px #4e654f, inset 0 -5px #18271f, 0 5px #111c17; }
+.achievement-wall::backdrop, .controls-dialog::backdrop { background: #080f0bd0; }
+.controls-dialog { width: min(490px, calc(100% - 28px)); }
+.controls-dialog h2 { font: 800 1.45rem var(--mono); }
+.control-guide { display: grid; gap: 10px; margin: 15px 0 18px; }
+.control-guide > div { display: grid; gap: 4px; padding: 8px 10px; border: 1px solid #495f50; background: #1b2b22; }
+.control-guide dt { color: var(--accent); font: 700 .85rem var(--mono); }
+.control-guide dd { margin: 0; color: #d4e0d4; font-size: .9rem; line-height: 1.45; }
+.control-guide kbd { vertical-align: baseline; }
+.control-guide .guide-touch, .guide-touch-inline { display: none; }
+#start-game { width: 100%; min-height: 42px; border: 1px solid #b5e0ae; color: #1c2d21; background: #9bd5a8; box-shadow: inset 0 -4px #79b08b; font: 800 .94rem var(--mono); }
+#start-game:hover { background: #b2e4b8; }
 .achievement-wall header { display: flex; justify-content: space-between; align-items: center; gap: 9px; margin-bottom: 17px; }
 .achievement-wall h2 { font: 800 clamp(1.03rem, 5vw, 1.42rem) var(--mono); }
 .achievement-wall button { display: inline-flex; align-items: center; gap: 5px; padding: 4px 7px; border: 1px solid #728572; color: #eef4e8; background: #344b3b; font-size: .8rem; }
@@ -69,16 +80,13 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 #achievement-progress::-webkit-progress-value { background: #e9c675; }
 #achievement-progress::-moz-progress-bar { background: #e9c675; }
 .achievement-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
-.achievement-card { display: grid; grid-template-columns: 32px minmax(0, 1fr); align-items: center; gap: 9px; min-height: 58px; padding: 7px 8px; border: 1px solid #4e6454; background: #1c2c23; color: #cad6c9; }
+.achievement-empty { padding: 12px; border: 1px dashed #526754; color: #c0cfc1; font-size: .88rem; }
+.achievement-card { display: grid; grid-template-columns: 32px minmax(0, 1fr); align-items: center; gap: 9px; min-height: 58px; padding: 7px 8px; border: 1px solid #9e834f; background: #383425; color: #ffdf99; }
 .achievement-card:last-child:nth-child(odd) { grid-column: 1 / -1; }
-.achievement-card.unlocked { border-color: #9e834f; background: #383425; color: #ffdf99; }
 .achievement-card strong { font-size: .88rem; }
-.achievement-status { display: block; margin-top: 2px; color: #b5c5b6; font-size: .75rem; }
-.achievement-card.unlocked .achievement-status { color: #e2d3ac; }
-.achievement-mark { display: grid; place-items: center; width: 31px; height: 31px; border: 1px solid #536b5a; color: #aab9ac; background: #18251e; }
-.achievement-card.unlocked .achievement-mark { border-color: #9e834f; color: #f0c77a; background: #2a2a1f; }
-.achievement-mark::before { content: "?"; font: 700 .93rem var(--mono); }
-.achievement-card.unlocked .achievement-mark::before, .achievement-notice > div::before { content: ""; width: 22px; height: 22px; background: #f0c77a; clip-path: polygon(23% 8%, 77% 8%, 77% 20%, 100% 20%, 100% 42%, 89% 42%, 89% 53%, 68% 53%, 68% 64%, 56% 64%, 56% 79%, 78% 79%, 78% 92%, 22% 92%, 22% 79%, 44% 79%, 44% 64%, 32% 64%, 32% 53%, 11% 53%, 11% 42%, 0 42%, 0 20%, 23% 20%); }
+.achievement-system { display: block; margin-top: 2px; color: #e2d3ac; font-size: .75rem; }
+.achievement-mark { display: grid; place-items: center; width: 31px; height: 31px; border: 1px solid #9e834f; background: #2a2a1f; }
+.achievement-mark::before, .achievement-notice > div::before { content: ""; width: 22px; height: 22px; background: #f0c77a; clip-path: polygon(23% 8%, 77% 8%, 77% 20%, 100% 20%, 100% 42%, 89% 42%, 89% 53%, 68% 53%, 68% 64%, 56% 64%, 56% 79%, 78% 79%, 78% 92%, 22% 92%, 22% 79%, 44% 79%, 44% 64%, 32% 64%, 32% 53%, 11% 53%, 11% 42%, 0 42%, 0 20%, 23% 20%); }
 .achievement-notice > div::before { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); }
 
 .note { width: min(540px, calc(100% - 24px)); max-height: calc(100% - 24px); margin: auto; padding: clamp(14px, 4vw, 30px); border: 2px solid #b7975c; color: #352b1d; background: repeating-linear-gradient(0deg, #f3e5b6 0 25px, #e5d4a2 25px 26px); box-shadow: inset 0 -6px #dfca90, 5px 7px #151c17; color-scheme: light; }
@@ -145,15 +153,11 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 }
 
 @media (pointer: coarse) {
-  .game { --hud-bottom: max(108px, calc(env(safe-area-inset-bottom) + 96px)); }
+  .game { --hud-bottom: calc(max(12px, env(safe-area-inset-bottom)) + 52px); }
   .open-achievements { display: block; }
-  .touch-controls { position: absolute; bottom: max(12px, env(safe-area-inset-bottom)); left: max(12px, env(safe-area-inset-left)); display: grid; grid-template-columns: repeat(3, 46px); grid-template-rows: repeat(2, 40px); justify-content: center; gap: 3px; touch-action: none; }
-  .touch-controls button { color: var(--accent); background: #23372b; border: 1px solid #4a6c56; box-shadow: inset 0 -3px #15271d; font: 700 1.1rem var(--mono); user-select: none; touch-action: none; }
-  .touch-controls button:first-child { grid-column: 2; }
-  .touch-controls button:nth-child(2) { grid-column: 1; grid-row: 2; }
-  .touch-controls button:nth-child(3) { grid-column: 2; grid-row: 2; }
-  .touch-controls button:nth-child(4) { grid-column: 3; grid-row: 2; }
-  .touch-controls button:active { background: #41654e; }
+  .guide-keyboard { display: none; }
+  .control-guide .guide-touch { display: block; }
+  .guide-touch-inline { display: inline; }
   .interact kbd { display: none; }
   .send-command { display: inline-flex; }
   .terminal-form input { font-size: 16px; }

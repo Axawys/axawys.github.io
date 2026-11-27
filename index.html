@@ -14,12 +14,7 @@
   <main class="game" id="game">
     <canvas id="room" tabindex="0" aria-label="Офис Linux Lab. Двигайтесь на WASD или стрелках. Нажмите E рядом с компьютером или запиской, O открывает достижения."></canvas>
     <button class="interact" id="interact" type="button" hidden><kbd aria-hidden="true">E</kbd><span></span></button>
-    <div class="touch-controls" aria-label="Экранное управление">
-      <button type="button" data-direction="ArrowUp" aria-label="Вверх">↑</button>
-      <button type="button" data-direction="ArrowLeft" aria-label="Влево">←</button>
-      <button type="button" data-direction="ArrowDown" aria-label="Вниз">↓</button>
-      <button type="button" data-direction="ArrowRight" aria-label="Вправо">→</button>
-    </div>
+    <div id="move-joystick" class="move-joystick" aria-hidden="true" hidden><span></span></div>
     <button id="open-achievements" class="open-achievements" type="button">Достижения</button>
     <p id="death" role="status" hidden>Вы погибли</p>
     <div id="weapon-slots" class="weapon-slots" role="group" aria-label="Выбор оружия" hidden></div>
@@ -28,6 +23,32 @@
     <output id="health" class="visually-hidden" aria-label="Здоровье">100</output>
   </main>
 
+  <dialog id="controls" class="controls-dialog" aria-labelledby="controls-title">
+    <h2 id="controls-title">Управление</h2>
+    <dl class="control-guide">
+      <div>
+        <dt>Движение</dt>
+        <dd class="guide-keyboard"><kbd>WASD</kbd> или стрелки</dd>
+        <dd class="guide-touch">Коснитесь левой половины карты и сдвиньте палец, чтобы двигаться.</dd>
+      </div>
+      <div>
+        <dt>Записки и ПК</dt>
+        <dd class="guide-keyboard"><kbd>E</kbd> — взаимодействовать и закрывать записки, <kbd>Esc</kbd> — встать из-за ПК.</dd>
+        <dd class="guide-touch">Подойдите к записке или ПК и коснитесь появившейся подсказки.</dd>
+      </div>
+      <div>
+        <dt>Оружие</dt>
+        <dd class="guide-keyboard"><kbd>ЛКМ</kbd> — стрелять. Меняйте оружие на <kbd>1–5</kbd>, колёсиком или нажатием на слот.</dd>
+        <dd class="guide-touch">Коснитесь правой половины карты, чтобы прицелиться и выстрелить. Выбирайте оружие нажатием на слот.</dd>
+      </div>
+      <div>
+        <dt>Достижения</dt>
+        <dd><kbd>O</kbd><span class="guide-keyboard"> — открыть или закрыть</span><span class="guide-touch-inline"> или кнопка «Достижения» внизу справа</span></dd>
+      </div>
+    </dl>
+    <button id="start-game" type="button" autofocus>Играть</button>
+  </dialog>
+
   <dialog id="achievements" class="achievement-wall" aria-labelledby="achievement-title">
     <header>
       <h2 id="achievement-title">Достижения</h2>
@@ -35,17 +56,18 @@
     </header>
     <p id="achievement-summary"></p>
     <progress id="achievement-progress" aria-label="Открытые достижения"></progress>
+    <p id="achievement-empty" class="achievement-empty" hidden>Здесь появятся открытые достижения.</p>
     <ul id="achievement-list" class="achievement-list"></ul>
   </dialog>
 
   <dialog id="note" class="note" aria-labelledby="note-title">
     <header>
       <h2 id="note-title">Список дел</h2>
-      <button type="button" id="close-note" aria-label="Закрыть записку" autofocus>×</button>
+      <button type="button" id="close-note" aria-label="Закрыть записку" aria-keyshortcuts="E Escape" autofocus>×</button>
     </header>
     <ul id="tasks"></ul>
     <p class="note-hint" id="station-hint" hidden><strong id="hint-task"></strong><span id="hint-command"></span></p>
-    <p class="note-controls" id="note-controls">WASD / стрелки — ходить · E — взаимодействовать · O — достижения<br>ЛКМ — стрелять · 1–5, колёсико мыши или слот — менять оружие</p>
+    <p class="note-controls guide-keyboard">E — закрыть записку</p>
   </dialog>
 
   <dialog id="computer" class="computer" aria-labelledby="computer-title">

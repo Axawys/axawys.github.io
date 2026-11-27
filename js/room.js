@@ -95,7 +95,7 @@ export function movePlayer(dx, dy, elapsed) {
   if (!dx && !dy) return;
 
   player.facing = dy < 0 ? "north" : dy > 0 ? "south" : dx < 0 ? "west" : "east";
-  const step = elapsed * 107 / Math.hypot(dx, dy);
+  const step = elapsed * 107 / Math.max(1, Math.hypot(dx, dy));
   player.moving = moveBody(player, dx * step, dy * step);
   if (player.moving) player.stride += elapsed;
 }

@@ -19,6 +19,7 @@ function save(event) {
 export function createAchievements(tasks, restoreFocus) {
   const dialog = document.getElementById("achievements");
   const list = document.getElementById("achievement-list");
+  const empty = document.getElementById("achievement-empty");
   const summary = document.getElementById("achievement-summary");
   const progress = document.getElementById("achievement-progress");
   const toast = document.getElementById("achievement-notice");
@@ -30,27 +31,28 @@ export function createAchievements(tasks, restoreFocus) {
     const icon = document.createElement("span");
     const text = document.createElement("div");
     const title = document.createElement("strong");
-    const status = document.createElement("span");
+    const system = document.createElement("span");
     card.className = "achievement-card";
     icon.className = "achievement-mark";
     icon.setAttribute("aria-hidden", "true");
     title.textContent = task.achievement;
-    status.className = "achievement-status";
-    text.append(title, status);
+    system.className = "achievement-system";
+    system.textContent = task.system;
+    text.append(title, system);
     card.append(icon, text);
-    list.append(card);
-    return [task.event, { card, status, system: task.system }];
+    return [task.event, card];
   }));
 
   function render() {
     summary.textContent = "Получено " + unlocked.size + "/" + cards.size + " достижений";
     progress.max = cards.size;
     progress.value = unlocked.size;
-    for (const [event, { card, status, system }] of cards) {
-      const complete = unlocked.has(event);
-      card.classList.toggle("unlocked", complete);
-      status.textContent = system + " · " + (complete ? "Получено" : "Не открыто");
+    const visibleCards = [];
+    for (const [event, card] of cards) {
+      if (unlocked.has(event)) visibleCards.push(card);
     }
+    list.replaceChildren(...visibleCards);
+    empty.hidden = visibleCards.length > 0;
   }
 
   function unlock(task) {
