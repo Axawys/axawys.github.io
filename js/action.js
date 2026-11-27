@@ -50,6 +50,7 @@ function nearFree(x, y, radius) {
 }
 
 export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
+  let weaponsUnlocked = false;
   const state = {
     time: 0, aim: { x: player.x, y: player.y - 48, visible: false },
     robots: [], particles: [], shocks: [], shots: [], projectiles: [], pending: [], visitor: null, ally: null,
@@ -61,7 +62,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     get ammo() { return arsenal.ammo; },
     get owned() { return arsenal.owned; },
     get weapon() { return arsenal.equipped; },
-    get armed() { return !this.dead && this.robots.length > 0; },
+    get armed() { return weaponsUnlocked && !this.dead; },
   };
   let reviveIn = 0;
   const arsenal = createWeapons(state, player, burst, shock);
@@ -197,6 +198,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
       if (!point) continue;
       const speed = type.speed + (kind === "swarm" ? (index % 4) * 4 - 6 : 0);
       state.robots.push({ ...type, ...identity, ...point, kind, speed, hp: type.maxHp, stride: 0, flash: 0, ready: state.time + 0.45 });
+      weaponsUnlocked = true;
     }
     const color = robotTypes[event].color;
     shock(x, y + 16, 43, color, 0.35);
