@@ -7,7 +7,7 @@ const robotTypes = {
   walker: { name: "Робот ALT Linux", radius: 6, hitRadius: 15, eye: 21, maxHp: 1920, speed: 70, damage: 38, color: "#f6c786" },
   swarm: { name: "ИИ-агент", radius: 3, hitRadius: 6, eye: 4, maxHp: 440, speed: 87, damage: 12, color: "#e6ac76" },
   agent: { radius: 6, hitRadius: 15, eye: 13, maxHp: 1440, speed: 74, damage: 25 },
-  furry: { name: "Фурри", radius: 6, hitRadius: 13, eye: 17, maxHp: 1560, speed: 98, damage: 28, color: "#a8c8ff" },
+  furry: { name: "Фурри", radius: 6, hitRadius: 13, eye: 17, maxHp: 500, speed: 98, damage: 28, color: "#a8c8ff" },
 };
 
 const gentooOverheat = 2;
