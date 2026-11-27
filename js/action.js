@@ -3,16 +3,17 @@ import { clearPath, makeField, nearestCell, pursue } from "./navigation.js";
 import { createWeapons, weapons } from "./weapons.js";
 
 const robotTypes = {
-  spider: { name: "Паук Ubuntu", radius: 5, hitRadius: 10, eye: 8, maxHp: 1100, speed: 88, damage: 24, color: "#ff947a" },
-  walker: { name: "Робот ALT Linux", radius: 6, hitRadius: 15, eye: 21, maxHp: 1920, speed: 70, damage: 38, color: "#f6c786" },
-  swarm: { name: "ИИ-агент", radius: 3, hitRadius: 6, eye: 4, maxHp: 440, speed: 87, damage: 12, color: "#e6ac76" },
-  agent: { radius: 6, hitRadius: 15, eye: 13, maxHp: 1440, speed: 74, damage: 25 },
-  furry: { name: "Фурри", radius: 6, hitRadius: 13, eye: 17, maxHp: 500, speed: 98, damage: 28, color: "#a8c8ff" },
+  spider: { name: "Паук Ubuntu", radius: 5, eye: 8, maxHp: 1100, speed: 88, damage: 24, color: "#ff947a" },
+  walker: { name: "Робот ALT Linux", radius: 6, eye: 21, maxHp: 1920, speed: 70, damage: 38, color: "#f6c786" },
+  swarm: { name: "ИИ-агент", radius: 3, eye: 4, maxHp: 440, speed: 87, damage: 12, color: "#e6ac76" },
+  agent: { radius: 6, eye: 13, maxHp: 1440, speed: 74, damage: 25 },
+  furry: { name: "Фурри", radius: 6, eye: 17, maxHp: 500, speed: 98, damage: 28, color: "#a8c8ff" },
 };
 
 const gentooOverheat = 2;
 const gentooFire = 3;
 const gentooRadius = 106;
+const gentooMobDamage = 500;
 const allyDuration = 60;
 const allySpeed = 138;
 const allyMaxHp = 500;
@@ -189,6 +190,13 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
       burst(x, y + 2, ["#554b46", "#716054", "#353c38"], 35, 75, true);
       const distance = Math.hypot(player.x - blast.x, player.y - blast.y);
       if (distance <= blast.radius) hitPlayer(100, { fatal: true });
+      for (const robot of [...state.robots]) {
+        if (Math.hypot(robot.x - blast.x, robot.y - blast.y) <= blast.radius) {
+          arsenal.damageRobot(robot, gentooMobDamage, robot.x, robot.y - robot.eye);
+        }
+      }
+      const { ally } = state;
+      if (ally && Math.hypot(ally.x - blast.x, ally.y - blast.y) <= blast.radius) damageAlly(ally, gentooMobDamage);
       const shake = Math.min(1, Math.max(0, 1 - (distance - blast.radius) / 130));
       state.shake = Math.max(state.shake, shake);
       return;
@@ -329,8 +337,11 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
       robot.attackUntil = state.time + 0.19;
       robot.attackSide = ally.x < robot.x ? -1 : 1;
     }
+    damageAlly(ally, robot.damage);
+  }
 
-    ally.hp = Math.max(0, ally.hp - robot.damage);
+  function damageAlly(ally, damage) {
+    ally.hp = Math.max(0, ally.hp - damage);
     ally.flash = state.time + 0.14;
     if (ally.hp > 0) {
       burst(ally.x, ally.y - 15, [allyColor, "#ffba8a"], 5, 58);

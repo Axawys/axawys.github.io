@@ -12,6 +12,65 @@ export const weapons = [
 const burnDuration = 3;
 const burnInterval = 0.5;
 const burnDamage = 18;
+const flameStartWidth = 8;
+const flameSpread = 0.31;
+
+// Bounds relative to the sprite's feet, including the outer frames of its walk cycle.
+const hitboxes = {
+  spider: [[-17, -21, 17, 7]],
+  walker: [[-16, -34, 16, 4]],
+  swarm: [[-14, -15, 14, 7]],
+  agent: [[-25, -27, 25, 7]],
+  furry: [[-11, -37, 11, 3], [5, -22, 22, 1]],
+};
+
+function traceHitbox({ dx, dy }, left, top, right, bottom, range) {
+  if ((dx === 0 && (left > 0 || right < 0)) || (dy === 0 && (top > 0 || bottom < 0))) return null;
+  let entry = 0;
+  let exit = range;
+  if (dx !== 0) {
+    const first = left / dx;
+    const second = right / dx;
+    entry = Math.max(entry, Math.min(first, second));
+    exit = Math.min(exit, Math.max(first, second));
+  }
+  if (dy !== 0) {
+    const first = top / dy;
+    const second = bottom / dy;
+    entry = Math.max(entry, Math.min(first, second));
+    exit = Math.min(exit, Math.max(first, second));
+  }
+  return entry <= exit ? entry : null;
+}
+
+function flameOverlaps({ dx, dy }, left, top, right, bottom, range) {
+  const farWidth = flameStartWidth + range * flameSpread;
+  const endX = range * dx;
+  const endY = range * dy;
+  const offsetX = Math.abs(dy);
+  const offsetY = Math.abs(dx);
+  if (right < Math.min(-offsetX * flameStartWidth, endX - offsetX * farWidth)
+    || left > Math.max(offsetX * flameStartWidth, endX + offsetX * farWidth)
+    || bottom < Math.min(-offsetY * flameStartWidth, endY - offsetY * farWidth)
+    || top > Math.max(offsetY * flameStartWidth, endY + offsetY * farWidth)) return false;
+
+  const centerX = (left + right) / 2;
+  const centerY = (top + bottom) / 2;
+  const halfWidth = (right - left) / 2;
+  const halfHeight = (bottom - top) / 2;
+  const depth = centerX * dx + centerY * dy;
+  const depthExtent = halfWidth * offsetY + halfHeight * offsetX;
+  if (depth + depthExtent < 0 || depth - depthExtent > range) return false;
+
+  // A rectangle must overlap both sloping sides of the flame cone.
+  for (const side of [-1, 1]) {
+    const normalX = -dy * side - dx * flameSpread;
+    const normalY = dx * side - dy * flameSpread;
+    const nearest = centerX * normalX + centerY * normalY - halfWidth * Math.abs(normalX) - halfHeight * Math.abs(normalY);
+    if (nearest > flameStartWidth) return false;
+  }
+  return true;
+}
 
 function wallDistance(x, y, dx, dy, range) {
   const steps = Math.max(1, Math.ceil(range / 3));
@@ -70,16 +129,17 @@ export function createWeapons(state, player, burst, shock) {
     burst(robot.x, robot.y - robot.eye, ["#d9c491", "#f5a46b", "#687e72"], 16, 95);
   }
 
-  function firstRobot({ x, y, dx, dy }, range) {
+  function firstRobot(ray, range) {
     let result = null;
     for (const robot of state.robots) {
-      const vx = robot.x - x;
-      const vy = robot.y - robot.eye - y;
-      const along = vx * dx + vy * dy;
-      const across = Math.abs(vx * dy - vy * dx);
-      if (along < 0 || along > range || across > robot.hitRadius) continue;
-      result = { robot, distance: along };
-      range = along;
+      const x = Math.round(robot.x) - ray.x;
+      const y = Math.round(robot.y) - ray.y;
+      for (const [left, top, right, bottom] of hitboxes[robot.kind]) {
+        const distance = traceHitbox(ray, x + left, y + top, x + right, y + bottom, range);
+        if (distance === null || (result && distance >= range)) continue;
+        result = { robot, distance };
+        range = distance;
+      }
     }
     return result;
   }
@@ -100,12 +160,16 @@ export function createWeapons(state, player, burst, shock) {
     else if (limit < weapon.range) burst(endX, endY, ["#fedcab", "#877d5e"], 4, 56);
   }
 
-  function explode(x, y, weapon) {
+  function explode(x, y, weapon, directHit = null) {
     shock(x, y, weapon.radius, "#ffbe74", 0.43);
     burst(x, y - 4, ["#fff0bc", "#ffc47d", "#ef8450", "#ba593c"], 35, 142);
     burst(x, y, ["#60544b", "#49443d"], 8, 48, true);
     state.shake = Math.max(state.shake, 0.32);
     for (const robot of [...state.robots]) {
+      if (robot === directHit) {
+        damageRobot(robot, weapon.damage, x, y - 9);
+        continue;
+      }
       const dx = robot.x - x;
       const dy = robot.y - y;
       const distance = Math.hypot(dx, dy);
@@ -121,7 +185,7 @@ export function createWeapons(state, player, burst, shock) {
     const near = firstRobot(ray, clear);
     if (near || clear < weapon.length) {
       const distance = near?.distance ?? clear;
-      explode(ray.x + ray.dx * distance, ray.y + ray.dy * distance + 9, weapon);
+      explode(ray.x + ray.dx * distance, ray.y + ray.dy * distance + 9, weapon, near?.robot);
       return;
     }
     state.projectiles.push({ x: ray.muzzleX, y: ray.muzzleY, dx: ray.dx, dy: ray.dy, remaining: weapon.range, weapon });
@@ -168,10 +232,10 @@ export function createWeapons(state, player, burst, shock) {
     }
     for (const robot of [...state.robots]) {
       const vx = robot.x - x;
-      const vy = robot.y - robot.eye - y;
-      const along = vx * dx + vy * dy;
-      const across = Math.abs(vx * dy - vy * dx);
-      if (along < 0 || along > weapon.range || across > 8 + along * 0.31) continue;
+      const spriteX = Math.round(robot.x) - x;
+      const spriteY = Math.round(robot.y) - y;
+      if (!hitboxes[robot.kind].some(([left, top, right, bottom]) =>
+        flameOverlaps(ray, spriteX + left, spriteY + top, spriteX + right, spriteY + bottom, weapon.range))) continue;
       const groundY = robot.y - player.y;
       const distance = Math.hypot(vx, groundY);
       if (distance > 1 && wallDistance(x, player.y, vx / distance, groundY / distance, distance) < distance) continue;
@@ -217,7 +281,7 @@ export function createWeapons(state, player, burst, shock) {
     projectile.y += dy * travel;
     projectile.remaining -= travel;
     if (!target && clear === step && projectile.remaining > 0) return true;
-    explode(projectile.x, projectile.y + 9, weapon);
+    explode(projectile.x, projectile.y + 9, weapon, target?.robot);
     return false;
   }
 
