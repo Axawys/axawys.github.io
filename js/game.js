@@ -158,7 +158,10 @@ window.addEventListener("keyup", event => {
   if (event.code === "KeyE") interactionKeyHeld = false;
 });
 window.addEventListener("blur", resetInput);
-document.addEventListener("visibilitychange", resetInput);
+document.addEventListener("visibilitychange", () => {
+  resetInput();
+  previousTime = undefined;
+});
 
 byId("game").addEventListener("wheel", event => {
   if (!action.state.armed || terminal.isOpen || noteDialog.open || event.ctrlKey || !event.deltaY) return;
@@ -216,7 +219,8 @@ canvas.addEventListener("click", event => {
 });
 
 function frame(time) {
-  const elapsed = previousTime === undefined ? 0 : Math.min((time - previousTime) / 1000, 0.033);
+  const frameElapsed = previousTime === undefined ? 0 : (time - previousTime) / 1000;
+  const elapsed = Math.min(frameElapsed, 0.033);
   previousTime = time;
   const paused = terminal.isOpen || noteDialog.open;
   const canMove = !paused && !action.state.dead;
@@ -234,7 +238,7 @@ function frame(time) {
   } else {
     action.state.aim.visible = false;
   }
-  const respawned = !paused && action.update(elapsed, shootingPointer !== undefined, Boolean(shotRequest));
+  const respawned = !paused && action.update(elapsed, shootingPointer !== undefined, Boolean(shotRequest), frameElapsed);
   shotRequest = undefined;
   if (!action.state.armed) stopShooting();
   if (respawned) {

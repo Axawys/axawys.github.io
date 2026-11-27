@@ -1,11 +1,45 @@
 import { box, gunRay, label, line, pixels } from "./pixels.js";
 
 const robotTopOffset = { swarm: 10, spider: 17, agent: 26, walker: 33 };
+const healthGlyphs = {
+  0: ["01110", "10001", "10001", "10001", "10001", "10001", "01110"],
+  1: ["00100", "01100", "00100", "00100", "00100", "00100", "01110"],
+  2: ["01110", "10001", "00001", "00010", "00100", "01000", "11111"],
+  3: ["11110", "00001", "00001", "01110", "00001", "00001", "11110"],
+  4: ["00010", "00110", "01010", "10010", "11111", "00010", "00010"],
+  5: ["11111", "10000", "10000", "11110", "00001", "10001", "01110"],
+  6: ["00110", "01000", "10000", "11110", "10001", "10001", "01110"],
+  7: ["11111", "00001", "00010", "00100", "01000", "01000", "01000"],
+  8: ["01110", "10001", "10001", "01110", "10001", "10001", "01110"],
+  9: ["01110", "10001", "10001", "01111", "00001", "00010", "01100"],
+  H: ["10001", "10001", "10001", "11111", "10001", "10001", "10001"],
+  P: ["11110", "10001", "10001", "11110", "10000", "10000", "10000"],
+};
 
 function playerStatus(player, weapon) {
-  const height = weapon ? 23 : 12;
-  const half = weapon ? Math.max(17, Math.ceil(weapon.name.length * 2.2) + 4) : 17;
+  const height = weapon ? 27 : 16;
+  const half = weapon ? Math.max(21, Math.ceil(weapon.name.length * 2.2) + 4) : 21;
   return { x: Math.round(player.x), y: Math.round(player.y) - 24 - height, half, height };
+}
+
+function drawHealthText(ctx, hp, x, y) {
+  const digits = String(hp);
+  const width = (digits.length + 2) * 6 + 3;
+  let left = x - Math.floor(width / 2);
+  ctx.fillStyle = "#fff3d8";
+  for (const character of digits + " HP") {
+    if (character === " ") {
+      left += 4;
+      continue;
+    }
+    const glyph = healthGlyphs[character];
+    for (let row = 0; row < glyph.length; row++) {
+      for (let col = 0; col < glyph[row].length; col++) {
+        if (glyph[row][col] === "1") ctx.fillRect(left + col, y + row, 1, 1);
+      }
+    }
+    left += 6;
+  }
 }
 
 export function drawPlayer(ctx, player, action, time) {
@@ -44,11 +78,11 @@ export function drawPlayer(ctx, player, action, time) {
 
   const weapon = action.armed ? action.weapon : null;
   const status = playerStatus(player, weapon);
-  box(ctx, "#15241ded", x - status.half, status.y, status.half * 2, status.height);
+  box(ctx, "#111e17", x - status.half, status.y, status.half * 2, status.height);
   if (weapon) label(ctx, weapon.name, x, status.y + 2, weapon.color, 7);
-  label(ctx, player.hp + " HP", x, y - 35, "#f0eadb", 7);
-  box(ctx, "#653b39", x - 14, y - 27, 28, 2);
-  box(ctx, player.hp > 35 ? "#8fd39b" : "#fa8d79", x - 14, y - 27, Math.ceil(28 * player.hp / 100), 2);
+  drawHealthText(ctx, player.hp, x, y - 37);
+  box(ctx, "#653b39", x - 17, y - 28, 34, 3);
+  box(ctx, player.hp > 35 ? "#8fd39b" : "#fa8d79", x - 17, y - 28, Math.ceil(34 * player.hp / 100), 3);
 }
 
 export function drawWeapon(ctx, player, aim, weapon, laser) {

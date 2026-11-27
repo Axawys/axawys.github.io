@@ -9,8 +9,8 @@ const robotTypes = {
   agent: { radius: 6, hitRadius: 15, eye: 13, maxHp: 144, speed: 74, damage: 25 },
 };
 
-const gentooOverheat = 0.65;
-const gentooFire = 0.85;
+const gentooOverheat = 2;
+const gentooFire = 3;
 
 const swarmMembers = [
   { kind: "agent", name: "Claude Code", color: "#f3ae91", dx: -47, dy: 43 },
@@ -229,12 +229,12 @@ export function createAction(onNotice = () => {}) {
     }
   }
 
-  function update(elapsed, holding, pressed = false) {
+  function update(elapsed, holding, pressed = false, gentooElapsed = elapsed) {
     state.time += elapsed;
     state.invulnerable = Math.max(0, state.invulnerable - elapsed);
     state.shake = Math.max(0, state.shake - elapsed * 2.7);
     for (const event of state.pending) {
-      event.remaining -= elapsed;
+      event.remaining -= event.phase ? gentooElapsed : elapsed;
       if (event.remaining <= 0) finishEvent(event);
       else if (event.phase === "overheat" && event.remaining <= gentooFire) event.phase = "fire";
     }
