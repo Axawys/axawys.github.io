@@ -1,6 +1,6 @@
 import { label } from "./pixel-font.js";
 import { box } from "./pixels.js";
-import { drawBlastZones, drawEffects, drawPlayer, drawRobot, drawRobotTags, drawSupply, drawVisitor, drawWeapon } from "./sprites.js";
+import { drawAlly, drawBlastZones, drawBurningRobot, drawEffects, drawPlayer, drawRobot, drawRobotTags, drawSupply, drawVisitor, drawWeapon } from "./sprites.js";
 
 export const width = 1220;
 export const height = 966;
@@ -206,7 +206,12 @@ export function createRenderer(canvas) {
     }
     for (const note of notes) layers.push({ depth: note.y, draw: () => drawNote(context, note, nearby === note) });
     for (const supply of action.supplies) layers.push({ depth: supply.y, draw: () => drawSupply(context, supply) });
-    for (const robot of action.robots) layers.push({ depth: robot.y, draw: () => drawRobot(context, robot, time) });
+    for (const robot of action.robots) layers.push({ depth: robot.y, draw: () => {
+      drawRobot(context, robot, time);
+      drawBurningRobot(context, robot, time);
+    } });
+    const ally = action.ally;
+    if (ally) layers.push({ depth: ally.y, draw: () => drawAlly(context, ally, time) });
     if (action.visitor) layers.push({ depth: action.visitor.y, draw: () => drawVisitor(context, action.visitor, time, player) });
     layers.push({ depth: player.y, draw: () => {
       drawPlayer(context, player, action, time);

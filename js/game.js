@@ -19,6 +19,8 @@ const hintPanel = byId("station-hint");
 const health = byId("health");
 const death = byId("death");
 const weaponSlots = byId("weapon-slots");
+const allyTimer = byId("ally-timer");
+const allyTime = byId("ally-time");
 const eventNotices = byId("event-notices");
 const activeNotices = [];
 const note = noteSpots[Math.floor(Math.random() * noteSpots.length)];
@@ -38,9 +40,9 @@ const achievementTasks = tasks.filter(task => task.achievement);
 const achievements = createAchievements([...achievementTasks, finaleAchievement], () => canvas.focus({ preventScroll: true }));
 const action = createAction(showNotice, () => achievements.unlock(finaleAchievement));
 action.state.medal = achievements.has(finaleAchievement.event);
-const terminal = createTerminal(stations, systems, (task, station) => {
+const terminal = createTerminal(stations, systems, (task, station, event) => {
   taskRows.get(task).classList.add("done");
-  action.trigger(task.event, station, renderer.camera);
+  action.trigger(event, station, renderer.camera);
   if (task.achievement) achievements.unlock(task);
 });
 
@@ -111,6 +113,11 @@ function commandSequence(task) {
   const command = document.createElement("code");
   command.textContent = task.command;
   instruction.append(command);
+  if (task.alternative) {
+    const alternative = document.createElement("code");
+    alternative.textContent = task.alternative.command;
+    instruction.append(document.createElement("br"), "или ", alternative);
+  }
   return instruction;
 }
 
@@ -338,6 +345,14 @@ function updateAim() {
   return false;
 }
 
+function updateAllyTimer() {
+  const remaining = Math.ceil(action.state.ally?.remaining ?? 0);
+  allyTimer.hidden = remaining <= 0;
+  if (allyTimer.hidden) return;
+  const label = Math.floor(remaining / 60) + ":" + String(remaining % 60).padStart(2, "0");
+  if (allyTime.textContent !== label) allyTime.textContent = label;
+}
+
 function frame(time) {
   const frameElapsed = previousTime === undefined ? 0 : (time - previousTime) / 1000;
   const elapsed = Math.min(frameElapsed, 0.033);
@@ -370,6 +385,7 @@ function frame(time) {
     else if (!paused && achievementTasks.every(task => achievements.has(task.event))) action.startCelebration();
   }
   updateWeaponSlots();
+  updateAllyTimer();
   renderer.draw({ nearby, visited: terminal.visited, notes, action: action.state, time: action.state.time });
   requestAnimationFrame(frame);
 }

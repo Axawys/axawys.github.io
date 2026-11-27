@@ -11,6 +11,7 @@ export function createTerminal(stations, systems, onMaintenance) {
   const input = byId("command");
   const promptLabel = byId("prompt");
   const visited = new Set();
+  const usedCommands = new Set();
   let active;
 
   const sessions = stations.map((station, index) => {
@@ -80,19 +81,23 @@ export function createTerminal(stations, systems, onMaintenance) {
   }
 
   function maintenance(command) {
-    const task = tasks.find(item => item.command === command);
+    const task = tasks.find(item => item.command === command || item.alternative?.command === command);
     if (!task) return false;
+    const option = task.alternative?.command === command ? task.alternative : task;
     if (task.system !== active.system.name) {
       print("Эта операция предназначена для " + task.system + ".");
     } else if (task.setup && !active.root) {
       print("E: Недостаточно прав. Сначала выполните su -.");
+    } else if (option.once && usedCommands.has(command)) {
+      print("Фурри-союзника можно вызвать только один раз за игру.");
     } else if (active.completed) {
       print("Ничего не изменилось. Задание уже выполнено.");
     } else {
       active.completed = true;
+      if (option.once) usedCommands.add(command);
       const station = active.station;
       close();
-      onMaintenance(task, station);
+      onMaintenance(task, station, option.event);
     }
     return true;
   }

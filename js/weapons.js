@@ -9,6 +9,10 @@ export const weapons = [
   { id: "rifle", kind: "bullet", name: "Автомат", capacity: 50, length: 13, thickness: 3, color: "#a8b7a5", range: 560, damage: 24, cooldown: 0.105, automatic: true },
 ];
 
+const burnDuration = 3;
+const burnInterval = 0.5;
+const burnDamage = 18;
+
 function wallDistance(x, y, dx, dy, range) {
   const steps = Math.max(1, Math.ceil(range / 3));
   const step = range / steps;
@@ -55,10 +59,10 @@ export function createWeapons(state, player, burst, shock) {
     select(next);
   }
 
-  function hit(robot, damage, x, y) {
+  function damageRobot(robot, damage, x, y, colors = [robot.color, "#ffe6b1"]) {
     robot.flash = state.time + 0.11;
     robot.hp -= damage;
-    burst(x, y, [robot.color, "#ffe6b1"], 8, 83);
+    burst(x, y, colors, 8, 83);
     if (robot.hp > 0) return;
 
     state.robots.splice(state.robots.indexOf(robot), 1);
@@ -92,7 +96,7 @@ export function createWeapons(state, player, burst, shock) {
       x: x + dx * muzzle, y: y + dy * muzzle,
       endX, endY, life: 0.075,
     });
-    if (target) hit(target.robot, weapon.damage, endX, endY);
+    if (target) damageRobot(target.robot, weapon.damage, endX, endY);
     else if (limit < weapon.range) burst(endX, endY, ["#fedcab", "#877d5e"], 4, 56);
   }
 
@@ -108,7 +112,7 @@ export function createWeapons(state, player, burst, shock) {
       if (distance > weapon.radius) continue;
       if (distance > 1 && wallDistance(x, y, dx / distance, dy / distance, distance) < distance) continue;
       const damage = Math.round(weapon.damage * (1 - distance / weapon.radius * 0.48));
-      hit(robot, damage, robot.x, robot.y - robot.eye);
+      damageRobot(robot, damage, robot.x, robot.y - robot.eye);
     }
   }
 
@@ -171,7 +175,23 @@ export function createWeapons(state, player, burst, shock) {
       const groundY = robot.y - player.y;
       const distance = Math.hypot(vx, groundY);
       if (distance > 1 && wallDistance(x, player.y, vx / distance, groundY / distance, distance) < distance) continue;
-      hit(robot, weapon.damage, robot.x, robot.y - robot.eye);
+      damageRobot(robot, weapon.damage, robot.x, robot.y - robot.eye);
+      if (robot.hp <= 0) continue;
+      robot.burn ??= { nextTick: state.time + burnInterval };
+      robot.burn.until = state.time + burnDuration;
+    }
+  }
+
+  function advanceBurns() {
+    for (const robot of [...state.robots]) {
+      const burn = robot.burn;
+      if (!burn) continue;
+      const end = Math.min(state.time, burn.until);
+      while (burn.nextTick <= end + 1e-9 && robot.hp > 0) {
+        damageRobot(robot, burnDamage, robot.x, robot.y - robot.eye, ["#ffd68a", "#ee7541"]);
+        burn.nextTick += burnInterval;
+      }
+      if (state.time >= burn.until) delete robot.burn;
     }
   }
 
@@ -204,6 +224,7 @@ export function createWeapons(state, player, burst, shock) {
   function update(elapsed, holding, pressed) {
     cooldown -= elapsed;
     state.projectiles = state.projectiles.filter(projectile => advanceProjectile(projectile, elapsed));
+    advanceBurns();
     if (!state.armed || cooldown > 0 || ammo[selected] === 0) return;
     const weapon = weapons[selected];
     if (!pressed && !(holding && weapon.automatic)) return;
@@ -219,5 +240,5 @@ export function createWeapons(state, player, burst, shock) {
     cooldown = weapon.cooldown;
   }
 
-  return { ammo, owned, collect, cycle, refill, select, update, get equipped() { return weapons[selected]; } };
+  return { ammo, owned, collect, cycle, damageRobot, refill, select, update, get equipped() { return weapons[selected]; } };
 }

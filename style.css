@@ -49,6 +49,8 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 .weapon-slots:not([hidden]) ~ .event-notices { bottom: calc(var(--hud-bottom) + var(--slot-height) + 9px); }
 .event-notices p { padding: 10px 14px; border: 1px solid #648774; border-inline-start: 4px solid #98d8b5; color: #e1f3e6; background: #172a22f5; box-shadow: 0 3px #0d1712b8; text-align: center; font: 700 clamp(.8rem, 2.7vw, .95rem)/1.35 var(--mono); }
 .event-notices .warning { border-color: #aa7755; border-inline-start-color: #f5ad79; color: #ffdfc2; background: #31231cf5; }
+.ally-timer { position: absolute; top: max(14px, env(safe-area-inset-top)); left: max(14px, env(safe-area-inset-left)); z-index: 4; display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border: 1px solid #78ad90; color: #d6f7e2; background: #203a2df5; box-shadow: 0 3px #121d17a8; pointer-events: none; font: 700 .8rem var(--mono); }
+#ally-time { color: #9fefb8; }
 .achievement-notice { position: absolute; top: max(14px, env(safe-area-inset-top)); right: max(14px, env(safe-area-inset-right)); z-index: 4; width: min(292px, calc(100% - 28px)); pointer-events: none; }
 .achievement-notice > div { position: relative; display: grid; gap: 3px; padding: 11px 14px 12px 48px; border: 1px solid #a58a52; border-inline-start: 3px solid #f0c77a; color: #ffe6a8; background: #2b2b20f7; box-shadow: 0 4px #121610a8; }
 .achievement-notice strong { font-size: .93rem; }
@@ -147,6 +149,10 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 .terminal-actions { display: flex; gap: 8px; }
 .vents { width: 55px; height: 13px; background: repeating-linear-gradient(90deg, #29382f 0 3px, transparent 3px 6px); }
 .send-command { display: none; }
+
+@media (max-width: 540px) {
+  .ally-timer:not([hidden]) ~ .achievement-notice { top: calc(max(14px, env(safe-area-inset-top)) + 44px); }
+}
 
 @media (max-width: 450px) {
   .achievement-list { grid-template-columns: minmax(0, 1fr); }

@@ -180,7 +180,7 @@ export function drawWeapon(ctx, player, aim, weapon, laser) {
   pixels(ctx, "#e44948", muzzleX, muzzleY, 2);
 }
 
-function drawFurry(ctx, robot, time) {
+function drawFurry(ctx, robot, time, friendly = false) {
   const x = Math.round(robot.x);
   const y = Math.round(robot.y);
   const step = Math.round(Math.sin(robot.stride * 1.45) * 2);
@@ -208,8 +208,8 @@ function drawFurry(ctx, robot, time) {
   box(ctx, fluff, x - 3, y - 16, 6, 7);
   box(ctx, "#627dab", x - 10, y - 17 - step, 4, 8);
   box(ctx, "#627dab", x + 6, y - 17 + step, 4, 8);
-  box(ctx, "#f7ae79", x - 7, y - 19, 14, 3);
-  box(ctx, "#b86c5d", x + 4, y - 16, 3, 4);
+  box(ctx, friendly ? "#91e6b2" : "#f7ae79", x - 7, y - 19, 14, 3);
+  box(ctx, friendly ? "#4e9e74" : "#b86c5d", x + 4, y - 16, 3, 4);
 
   for (const side of [-1, 1]) {
     const ear = x + side * 7 - 2;
@@ -228,7 +228,33 @@ function drawFurry(ctx, robot, time) {
   box(ctx, "#ffcc88", x + 3, y - 25, 2, 1);
   box(ctx, outline, x - 2, y - 22, 4, 2);
   if (time < robot.attackUntil) {
-    for (const offset of [0, 4, 8]) line(ctx, "#f6d9ac", x - 16 + offset, y - 14, x - 12 + offset, y - 20);
+    const side = robot.attackSide ?? -1;
+    const color = friendly ? "#a1f9bc" : "#f6d9ac";
+    for (const offset of [0, 4, 8]) line(ctx, color, x + side * (16 - offset), y - 14, x + side * (12 - offset), y - 20);
+  }
+}
+
+export function drawAlly(ctx, ally, time) {
+  drawFurry(ctx, ally, time, true);
+  const x = Math.round(ally.x);
+  const y = Math.round(ally.y) - 42;
+  box(ctx, "#17382a", x - 3, y - 2, 7, 7);
+  box(ctx, "#a8f4c4", x, y - 1, 1, 5);
+  box(ctx, "#a8f4c4", x - 2, y + 1, 5, 1);
+}
+
+export function drawBurningRobot(ctx, robot, time) {
+  if (!robot.burn) return;
+  const phase = Math.floor(time * 14);
+  const top = Math.round(robot.y) - robotTopOffset[robot.kind];
+  for (const [index, offset] of [-8, 0, 8].entries()) {
+    const x = Math.round(robot.x) + offset + (phase + index) % 3 - 1;
+    const y = top + 8 + (phase + index * 2) % 5;
+    const height = index === 1 ? 8 : 5;
+    box(ctx, "#f07139", x - 2, y - height + 2, 5, height);
+    box(ctx, "#ffb34e", x - 1, y - height, 3, height);
+    pixels(ctx, "#ffe5a1", x, y - height + 2, 2);
+    if ((phase + index) % 3 !== 0) pixels(ctx, "#ffcb6d", x + 1, y - height - 4, 1);
   }
 }
 

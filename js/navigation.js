@@ -67,7 +67,7 @@ export function makeField(start) {
   return parent;
 }
 
-function clearPath(body, target) {
+export function clearPath(body, target) {
   const dx = target.x - body.x;
   const dy = target.y - body.y;
   const count = Math.max(1, Math.ceil(Math.hypot(dx, dy) / 6));

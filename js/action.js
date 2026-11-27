@@ -1,5 +1,5 @@
 import { door, height, isWalkable, moveBody, player, playerStart, supplySpots, width } from "./room.js";
-import { makeField, nearestCell, pursue } from "./navigation.js";
+import { clearPath, makeField, nearestCell, pursue } from "./navigation.js";
 import { createWeapons, weapons } from "./weapons.js";
 
 const robotTypes = {
@@ -13,6 +13,9 @@ const robotTypes = {
 const gentooOverheat = 2;
 const gentooFire = 3;
 const gentooRadius = 106;
+const allyDuration = 60;
+const allySpeed = 138;
+const allyColor = "#91e6b2";
 const celebrationDuration = 10;
 const fireworkColors = ["#ffb578", "#92c9ff", "#f7dc8e", "#e9a1df", "#9af0bd"];
 
@@ -49,7 +52,7 @@ function nearFree(x, y, radius) {
 export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
   const state = {
     time: 0, aim: { x: player.x, y: player.y - 48, visible: false },
-    robots: [], particles: [], shocks: [], shots: [], projectiles: [], pending: [], visitor: null,
+    robots: [], particles: [], shocks: [], shots: [], projectiles: [], pending: [], visitor: null, ally: null,
     supplies: supplySpots.map(spot => {
       const index = weapons.findIndex(weapon => weapon.id === spot.weaponId);
       return { ...spot, index, weapon: weapons[index] };
@@ -145,6 +148,15 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
   }
 
   function trigger(event, station, view) {
+    if (event === "ally") {
+      if (state.ally) return;
+      const point = nearFree(station.x + 25, station.y + 45, 6) ?? nearFree(player.x, player.y, 6);
+      if (!point) return;
+      state.ally = { ...point, radius: 6, stride: 0, phase: "guard", remaining: allyDuration, nextAttack: state.time };
+      burst(point.x, point.y - 12, [allyColor, "#e0f8d8"], 16, 66);
+      onNotice("Фурри-союзник пришёл на помощь");
+      return;
+    }
     if (event === "visitor" || event === "elder") {
       const visit = { kind: event, view };
       if (state.visitor) queuedVisitors.push(visit);
@@ -193,10 +205,18 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     onNotice(eventText[event], true);
   }
 
-  function sendToDoor(visitor) {
-    visitor.phase = "door";
-    visitor.target = door;
-    visitor.field = doorField;
+  function walkOut(actor, elapsed, speed) {
+    if (actor.phase === "door") {
+      if (Math.hypot(actor.x - door.x, actor.y - door.y) >= 8) {
+        if (pursue(actor, door, doorField, speed * elapsed)) actor.stride += elapsed * 11;
+        return false;
+      }
+      actor.x = door.x;
+      actor.phase = "exit";
+    }
+    actor.y += speed * elapsed;
+    actor.stride += elapsed * 11;
+    return actor.y > height + 28;
   }
 
   function advanceElder(visitor, elapsed) {
@@ -213,7 +233,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     } else if (state.time >= visitor.swingAt) {
       hitPlayer(1, { ignoreProtection: true });
       visitor.swingUntil = state.time + 0.24;
-      sendToDoor(visitor);
+      visitor.phase = "door";
     }
   }
 
@@ -224,28 +244,67 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
       advanceElder(visitor, elapsed);
       return;
     }
-    if (visitor.phase === "exit") {
-      visitor.y += 101 * elapsed;
-      if (visitor.y > height + 28) {
+    if (visitor.phase === "door" || visitor.phase === "exit") {
+      if (walkOut(visitor, elapsed, 101)) {
         state.visitor = null;
         if (queuedVisitors.length) callVisitor(queuedVisitors.shift());
       }
-    } else {
-      const { target, field } = visitor;
-      const distance = Math.hypot(visitor.x - target.x, visitor.y - target.y);
-      if (distance < 8) {
-        if (visitor.phase === "visit") {
-          sendToDoor(visitor);
-          visitor.labelUntil = state.time + 2.5;
-          onNotice(eventText.visitor);
-        } else {
-          visitor.x = door.x;
-          visitor.phase = "exit";
-        }
-      }
-      pursue(visitor, visitor.target, visitor.field, 101 * elapsed);
+      return;
     }
-    visitor.stride += elapsed * 11;
+    if (Math.hypot(visitor.x - visitor.target.x, visitor.y - visitor.target.y) < 8) {
+      visitor.phase = "door";
+      visitor.labelUntil = state.time + 2.5;
+      onNotice(eventText.visitor);
+      return;
+    }
+    if (pursue(visitor, visitor.target, visitor.field, 101 * elapsed)) visitor.stride += elapsed * 11;
+  }
+
+  function allyThreat(ally) {
+    let nearest;
+    let nearestDistance = 144;
+    for (const robot of state.robots) {
+      const distance = Math.hypot(robot.x - player.x, robot.y - player.y);
+      if (distance >= nearestDistance || Math.hypot(robot.x - ally.x, robot.y - ally.y) > 164) continue;
+      nearest = robot;
+      nearestDistance = distance;
+    }
+    return nearest;
+  }
+
+  function advanceAlly(elapsed, sceneElapsed) {
+    const ally = state.ally;
+    if (!ally) return;
+    if (ally.phase !== "guard") {
+      if (walkOut(ally, elapsed, 110)) state.ally = null;
+      return;
+    }
+    ally.remaining = Math.max(0, ally.remaining - sceneElapsed);
+    if (ally.remaining === 0) {
+      ally.phase = "door";
+      onNotice("Фурри-союзник уходит");
+      return;
+    }
+
+    const threat = state.dead ? undefined : allyThreat(ally);
+    if (threat && Math.hypot(ally.x - threat.x, ally.y - threat.y) < 24 && clearPath(ally, threat)) {
+      if (state.time >= ally.nextAttack) {
+        ally.nextAttack = state.time + 0.56;
+        ally.attackUntil = state.time + 0.24;
+        ally.attackSide = threat.x < ally.x ? -1 : 1;
+        arsenal.damageRobot(threat, 140, threat.x, threat.y - threat.eye, [allyColor, "#e7ffe6"]);
+      }
+      return;
+    }
+
+    const target = threat ?? nearFree(player.x + 22, player.y + 14, ally.radius);
+    if (!target) return;
+    const cell = nearestCell(target.x, target.y);
+    if (ally.targetCell !== cell) {
+      ally.targetCell = cell;
+      ally.field = makeField(cell);
+    }
+    if (pursue(ally, target, ally.field, allySpeed * elapsed)) ally.stride += elapsed * 13;
   }
 
   function fieldTowardPlayer({ x, y }) {
@@ -259,9 +318,21 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
 
   function advanceRobots(elapsed) {
     const field = fieldTowardPlayer(player);
+    const ally = state.ally?.phase === "guard" ? state.ally : null;
     for (const robot of state.robots) {
       if (state.time < robot.ready) continue;
       const gap = Math.hypot(player.x - robot.x, player.y - robot.y);
+      if (ally) {
+        const dx = ally.x - robot.x;
+        const dy = ally.y - robot.y;
+        const allyGap = Math.hypot(dx, dy);
+        const intercepted = allyGap < 34 || (allyGap < 52 && allyGap < gap + 6);
+        if (intercepted && clearPath(robot, ally)) {
+          const travel = Math.min(robot.speed * elapsed, allyGap - robot.radius - ally.radius - 1);
+          if (travel > 0 && moveBody(robot, dx * travel / allyGap, dy * travel / allyGap)) robot.stride += elapsed * 13;
+          continue;
+        }
+      }
       if (gap < robot.radius + player.radius + 1) {
         if (robot.kind === "furry" && !state.invulnerable && !state.dead) robot.attackUntil = state.time + 0.19;
         hitPlayer(robot.damage);
@@ -353,6 +424,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     state.shocks = state.shocks.filter(effect => effect.life > 0);
     state.shots = state.shots.filter(shot => shot.life > 0);
     advanceVisitor(elapsed);
+    advanceAlly(elapsed, sceneElapsed);
     arsenal.update(elapsed, holding, pressed);
     advanceCelebration(sceneElapsed);
 
