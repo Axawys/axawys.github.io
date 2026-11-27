@@ -5,6 +5,7 @@ export const tasks = [
   { system: "Fedora", title: "Обновить Fedora", command: "sudo dnf upgrade", event: "visitor", achievement: "Ядро в порядке" },
   { system: "Omarchy", title: "Удалить систему Omarchy", command: "sudo rm -rf /", event: "swarm", achievement: "Атака ИИ-агентов" },
   { system: "NixOS", title: "Удалить хранилище NixOS", command: "sudo rm -rf /nix/store", event: "furry", achievement: "Пушистая ярость" },
+  { system: "Debian", title: "Обновить Debian", command: "sudo apt update && sudo apt upgrade", event: "elder" },
 ];
 
 export const finaleAchievement = { system: "Linux Lab", event: "linux-user", achievement: "Настоящий линуксоид" };

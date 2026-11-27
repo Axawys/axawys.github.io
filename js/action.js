@@ -31,6 +31,7 @@ const eventText = {
   swarm: "На вас напали ИИ-агенты",
   furry: "Пушистая ярость",
   visitor: "Линус Торвальдс прошёл мимо. Ядро в порядке.",
+  elder: "Ну и зачем ты это сделал? Оно же работало",
 };
 
 function nearFree(x, y, radius) {
@@ -79,10 +80,10 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     state.shocks.push({ x, y, radius, color, life: duration, total: duration });
   }
 
-  function hitPlayer(damage, fatal = false) {
-    if (state.dead || (state.invulnerable > 0 && !fatal)) return;
+  function hitPlayer(damage, { fatal = false, ignoreProtection = fatal } = {}) {
+    if (state.dead || (state.invulnerable > 0 && !ignoreProtection)) return;
     player.hp = Math.max(0, player.hp - damage);
-    state.invulnerable = 0.65;
+    state.invulnerable = Math.max(state.invulnerable, 0.65);
     state.shake = Math.max(state.shake, 0.22);
     if (player.hp > 0) return;
 
@@ -114,7 +115,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     state.shake = 0;
   }
 
-  function callVisitor(view) {
+  function callVisitor({ kind, view }) {
     const candidates = [];
     for (const ratio of [0.17, 0.4, 0.67, 0.87]) {
       candidates.push(
@@ -125,6 +126,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
       );
     }
     const target = nearFree(player.x + 17, player.y + 10, 6) ?? nearFree(player.x, player.y, 6);
+    if (!target) return;
     const field = makeField(nearestCell(target.x, target.y));
     const start = candidates
       .map(({ x, y }) => nearFree(x, y, 6))
@@ -134,13 +136,14 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
       .sort((a, b) => (Math.hypot(a.x - target.x, a.y - target.y) + Math.max(0, a.y - target.y) * 0.4)
         - (Math.hypot(b.x - target.x, b.y - target.y) + Math.max(0, b.y - target.y) * 0.4))[0];
     if (!start) return;
-    state.visitor = { ...start, radius: 6, stride: 0, phase: "visit", target, field, labelUntil: 0 };
+    state.visitor = { ...start, kind, radius: 6, stride: 0, phase: "visit", target, field, labelUntil: 0 };
   }
 
   function trigger(event, station, view) {
-    if (event === "visitor") {
-      if (state.visitor) queuedVisitors.push(view);
-      else callVisitor(view);
+    if (event === "visitor" || event === "elder") {
+      const visit = { kind: event, view };
+      if (state.visitor) queuedVisitors.push(visit);
+      else callVisitor(visit);
       return;
     }
     station.busy = true;
@@ -163,7 +166,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
       burst(x, y - 5, ["#fff1bb", "#ffc277", "#ff914f", "#de673c", "#6e4a3e"], 107, 265);
       burst(x, y + 2, ["#554b46", "#716054", "#353c38"], 35, 75, true);
       const distance = Math.hypot(player.x - blast.x, player.y - blast.y);
-      if (distance <= blast.radius) hitPlayer(100, true);
+      if (distance <= blast.radius) hitPlayer(100, { fatal: true });
       const shake = Math.min(1, Math.max(0, 1 - (distance - blast.radius) / 130));
       state.shake = Math.max(state.shake, shake);
       return;
@@ -185,9 +188,37 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     onNotice(eventText[event], true);
   }
 
+  function sendToDoor(visitor) {
+    visitor.phase = "door";
+    visitor.target = door;
+    visitor.field = doorField;
+  }
+
+  function advanceElder(visitor, elapsed) {
+    if (state.dead || Math.hypot(visitor.x - player.x, visitor.y - player.y) > 17) {
+      const target = nearFree(player.x, player.y, visitor.radius);
+      if (target && pursue(visitor, target, fieldTowardPlayer(target), 122 * elapsed)) visitor.stride += elapsed * 9;
+      return;
+    }
+    if (visitor.phase === "visit") {
+      visitor.phase = "swing";
+      visitor.swingAt = state.time + 0.5;
+      visitor.labelUntil = state.time + 2.5;
+      onNotice(eventText.elder);
+    } else if (state.time >= visitor.swingAt) {
+      hitPlayer(1, { ignoreProtection: true });
+      visitor.swingUntil = state.time + 0.24;
+      sendToDoor(visitor);
+    }
+  }
+
   function advanceVisitor(elapsed) {
     const visitor = state.visitor;
     if (!visitor) return;
+    if (visitor.kind === "elder" && (visitor.phase === "visit" || visitor.phase === "swing")) {
+      advanceElder(visitor, elapsed);
+      return;
+    }
     if (visitor.phase === "exit") {
       visitor.y += 101 * elapsed;
       if (visitor.y > height + 28) {
@@ -199,9 +230,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
       const distance = Math.hypot(visitor.x - target.x, visitor.y - target.y);
       if (distance < 8) {
         if (visitor.phase === "visit") {
-          visitor.phase = "door";
-          visitor.target = door;
-          visitor.field = doorField;
+          sendToDoor(visitor);
           visitor.labelUntil = state.time + 2.5;
           onNotice(eventText.visitor);
         } else {
@@ -214,12 +243,17 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     visitor.stride += elapsed * 11;
   }
 
-  function advanceRobots(elapsed) {
-    const target = nearestCell(player.x, player.y);
-    if (target !== playerCell || !playerField) {
-      playerCell = target;
-      playerField = makeField(target);
+  function fieldTowardPlayer({ x, y }) {
+    const cell = nearestCell(x, y);
+    if (cell !== playerCell || !playerField) {
+      playerCell = cell;
+      playerField = makeField(cell);
     }
+    return playerField;
+  }
+
+  function advanceRobots(elapsed) {
+    const field = fieldTowardPlayer(player);
     for (const robot of state.robots) {
       if (state.time < robot.ready) continue;
       const gap = Math.hypot(player.x - robot.x, player.y - robot.y);
@@ -228,7 +262,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
         hitPlayer(robot.damage);
         continue;
       }
-      if (pursue(robot, player, playerField, robot.speed * elapsed)) robot.stride += elapsed * 13;
+      if (pursue(robot, player, field, robot.speed * elapsed)) robot.stride += elapsed * 13;
     }
     for (let i = 0; i < state.robots.length; i++) {
       const first = state.robots[i];

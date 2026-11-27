@@ -28,8 +28,9 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .move-joystick { position: absolute; z-index: 3; display: grid; place-items: center; width: 100px; height: 100px; pointer-events: none; transform: translate(-50%, -50%); border: 2px solid #a5cea2b3; border-radius: 50%; background: #11251b9c; box-shadow: inset 0 0 0 4px #1326198c, 0 2px #1019139e; }
 .move-joystick span { width: 30px; height: 30px; border: 2px solid #cef1c8; border-radius: 50%; background: #679376d9; box-shadow: inset 0 -4px #385b458c; }
-.open-achievements { display: none; position: absolute; right: max(12px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom)); z-index: 3; min-height: 40px; padding: 6px 11px; border: 1px solid #8a7a53; background: #302d21; color: #f7df9d; box-shadow: inset 0 -3px #222118; font-size: .8rem; font-weight: 700; }
-.open-achievements:hover { background: #4b4129; }
+.touch-menu { display: none; position: absolute; right: max(12px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom)); z-index: 3; gap: 7px; }
+.touch-menu button { min-height: 40px; padding: 6px 11px; border: 1px solid #8a7a53; background: #302d21; color: #f7df9d; box-shadow: inset 0 -3px #222118; font-size: .8rem; font-weight: 700; }
+.touch-menu button:hover { background: #4b4129; }
 #death { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; color: #ffe5d6; background: radial-gradient(ellipse at center, transparent 25%, #5c1d265c); text-shadow: 2px 3px #3c1d21; font: 700 clamp(1.4rem, 4vw, 2.2rem) var(--mono); }
 .weapon-slots { position: absolute; inset: auto 0 var(--hud-bottom); z-index: 3; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; width: min(452px, calc(100% - 20px)); height: var(--slot-height); margin-inline: auto; }
 .weapon-slot { position: relative; display: grid; justify-items: center; align-content: end; gap: 3px; min-width: 0; padding: 5px 1px 7px; border: 1px solid #557364; background: #162820f5; color: #d7e5da; box-shadow: 0 3px #0c1712a8, inset 0 -3px #102018; font-size: clamp(.6rem, 2.8vw, .78rem); font-weight: 700; white-space: nowrap; }
@@ -71,6 +72,7 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 #start-game:hover { background: #b2e4b8; }
 .achievement-wall header { display: flex; justify-content: space-between; align-items: center; gap: 9px; margin-bottom: 17px; }
 .achievement-wall h2 { font: 800 clamp(1.03rem, 5vw, 1.42rem) var(--mono); }
+.achievement-wall h3 { margin: 0 0 8px; font: 700 .95rem var(--mono); }
 .achievement-wall button { display: inline-flex; align-items: center; gap: 5px; padding: 4px 7px; border: 1px solid #728572; color: #eef4e8; background: #344b3b; font-size: .8rem; }
 .achievement-wall button:hover { background: #496451; }
 .achievement-wall button kbd { min-width: 19px; min-height: 19px; padding-inline: 3px; }
@@ -154,7 +156,7 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 
 @media (pointer: coarse) {
   .game { --hud-bottom: calc(max(12px, env(safe-area-inset-bottom)) + 52px); }
-  .open-achievements { display: block; }
+  .touch-menu { display: flex; }
   .guide-keyboard { display: none; }
   .control-guide .guide-touch { display: block; }
   .guide-touch-inline { display: inline; }

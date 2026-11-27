@@ -33,13 +33,14 @@ const notes = [note, ...stations.map((station, index) => ({
 
 const renderer = createRenderer(canvas);
 const joystick = createJoystick(canvas, byId("move-joystick"));
-const achievements = createAchievements([...tasks, finaleAchievement], () => canvas.focus({ preventScroll: true }));
+const achievementTasks = tasks.filter(task => task.achievement);
+const achievements = createAchievements([...achievementTasks, finaleAchievement], () => canvas.focus({ preventScroll: true }));
 const action = createAction(showNotice, () => achievements.unlock(finaleAchievement));
 action.state.medal = achievements.has(finaleAchievement.event);
 const terminal = createTerminal(stations, systems, (task, station) => {
   taskRows.get(task).classList.add("done");
   action.trigger(task.event, station, renderer.camera);
-  achievements.unlock(task);
+  if (task.achievement) achievements.unlock(task);
 });
 
 const slotButtons = weapons.map((weapon, index) => {
@@ -162,9 +163,9 @@ function closeNote() {
   canvas.focus({ preventScroll: true });
 }
 
-function toggleAchievements() {
+function toggleAchievements(pause = false) {
   if (!achievements.isOpen) resetInput();
-  achievements.toggle();
+  achievements.toggle(pause);
 }
 
 function resetInput() {
@@ -198,7 +199,8 @@ function updateInteraction(paused) {
 interactButton.addEventListener("click", interact);
 byId("start-game").addEventListener("click", () => controlsDialog.close());
 controlsDialog.addEventListener("close", () => canvas.focus({ preventScroll: true }));
-byId("open-achievements").addEventListener("click", toggleAchievements);
+byId("open-achievements").addEventListener("click", () => toggleAchievements());
+byId("open-pause").addEventListener("click", () => toggleAchievements(true));
 byId("close-note").addEventListener("click", closeNote);
 noteDialog.addEventListener("cancel", event => {
   event.preventDefault();
@@ -222,9 +224,9 @@ window.addEventListener("keydown", event => {
     }
     return;
   }
-  if (event.code === "KeyO") {
+  if (event.code === "KeyO" || event.code === "KeyP") {
     event.preventDefault();
-    if (!event.repeat) toggleAchievements();
+    if (!event.repeat) toggleAchievements(event.code === "KeyP");
     return;
   }
   if (achievements.isOpen || action.state.dead) return;
@@ -335,7 +337,7 @@ function frame(time) {
   canvas.classList.toggle("armed", action.state.armed);
   if (!action.state.medal && !action.state.celebration) {
     if (achievements.has(finaleAchievement.event)) action.state.medal = true;
-    else if (!paused && tasks.every(task => achievements.has(task.event))) action.startCelebration();
+    else if (!paused && achievementTasks.every(task => achievements.has(task.event))) action.startCelebration();
   }
   updateWeaponSlots();
   renderer.draw({ nearby, visited: terminal.visited, notes, action: action.state, time: action.state.time });

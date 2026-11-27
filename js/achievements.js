@@ -18,6 +18,9 @@ function save(event) {
 
 export function createAchievements(tasks, restoreFocus) {
   const dialog = document.getElementById("achievements");
+  const heading = document.getElementById("achievement-title");
+  const pauseHeading = document.getElementById("pause-achievements");
+  const closeButton = document.getElementById("close-achievements");
   const list = document.getElementById("achievement-list");
   const empty = document.getElementById("achievement-empty");
   const summary = document.getElementById("achievement-summary");
@@ -79,12 +82,19 @@ export function createAchievements(tasks, restoreFocus) {
     restoreFocus();
   }
 
-  function toggle() {
-    if (dialog.open) close();
-    else dialog.showModal();
+  function toggle(pause = false) {
+    if (dialog.open) {
+      close();
+      return;
+    }
+    heading.textContent = pause ? "Пауза" : "Достижения";
+    pauseHeading.hidden = !pause;
+    closeButton.querySelector("kbd").textContent = pause ? "P" : "O";
+    closeButton.querySelector("span").textContent = pause ? "Продолжить" : "Закрыть";
+    dialog.showModal();
   }
 
-  document.getElementById("close-achievements").addEventListener("click", close);
+  closeButton.addEventListener("click", close);
   dialog.addEventListener("cancel", event => {
     event.preventDefault();
     close();

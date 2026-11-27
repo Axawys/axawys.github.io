@@ -366,27 +366,56 @@ export function drawRobotTags(ctx, robots, livingPlayer, camera, weapon = null) 
   }
 }
 
+function drawElder(ctx, visitor, time, player, x, y, step) {
+  const side = player.x >= x ? 1 : -1;
+  const striking = time < visitor.swingUntil;
+  const raised = visitor.phase === "swing";
+  box(ctx, "#352e27", x - 5, y - 6 - step, 4, 6);
+  box(ctx, "#40362c", x + 1, y - 6 + step, 4, 6);
+  box(ctx, "#554538", x - 7, y - 15, 14, 10);
+  box(ctx, "#9a7557", x - 5, y - 16, 10, 9);
+  box(ctx, "#d3b890", x - 3, y - 16, 6, 2);
+  box(ctx, "#e6ba92", x - 4, y - 23, 9, 8);
+  box(ctx, "#e1ded0", x - 5, y - 25, 10, 4);
+  box(ctx, "#eee8dc", x - 3, y - 19, 7, 3);
+  box(ctx, "#5d463b", x + side * 2, y - 21, 2, 1);
+  const handX = x + side * 7;
+  const handY = y - (raised ? 17 : 10);
+  const tipX = handX + side * (striking ? 14 : raised ? 5 : 3);
+  const tipY = striking ? y - 12 : raised ? y - 28 : y;
+  box(ctx, "#dab18d", handX - 1, handY, 3, 3);
+  line(ctx, "#5f412e", handX, handY + 1, tipX, tipY, 2);
+  line(ctx, "#d2ac75", handX, handY, tipX, tipY);
+  if (striking) line(ctx, "#f3d5a7", tipX - side * 5, tipY - 4, tipX, tipY - 3);
+}
+
 export function drawVisitor(ctx, visitor, time, player) {
   const x = Math.round(visitor.x);
   const y = Math.round(visitor.y);
   const step = Math.round(Math.sin(visitor.stride * 1.4));
   box(ctx, "#13241bcc", x - 7, y - 1, 14, 4);
-  box(ctx, "#435c71", x - 5, y - 7 - step, 4, 7);
-  box(ctx, "#3d5061", x + 1, y - 7 + step, 4, 7);
-  box(ctx, "#693d47", x - 7, y - 16, 14, 10);
-  box(ctx, "#9b6570", x - 5, y - 17, 10, 10);
-  for (const pixel of [-4, 0, 4]) box(ctx, "#5c4753", x + pixel, y - 16, 1, 9);
-  box(ctx, "#aa8080", x - 5, y - 13, 10, 1);
-  box(ctx, "#dec2ae", x - 4, y - 25, 8, 8);
-  box(ctx, "#afa294", x - 5, y - 26, 10, 3);
-  box(ctx, "#3c3a3e", x - 4, y - 22, 8, 1);
-  box(ctx, "#f2e3c3", x - 3, y - 21, 6, 1);
+  if (visitor.kind === "elder") {
+    drawElder(ctx, visitor, time, player, x, y, step);
+  } else {
+    box(ctx, "#435c71", x - 5, y - 7 - step, 4, 7);
+    box(ctx, "#3d5061", x + 1, y - 7 + step, 4, 7);
+    box(ctx, "#693d47", x - 7, y - 16, 14, 10);
+    box(ctx, "#9b6570", x - 5, y - 17, 10, 10);
+    for (const pixel of [-4, 0, 4]) box(ctx, "#5c4753", x + pixel, y - 16, 1, 9);
+    box(ctx, "#aa8080", x - 5, y - 13, 10, 1);
+    box(ctx, "#dec2ae", x - 4, y - 25, 8, 8);
+    box(ctx, "#afa294", x - 5, y - 26, 10, 3);
+    box(ctx, "#3c3a3e", x - 4, y - 22, 8, 1);
+    box(ctx, "#f2e3c3", x - 3, y - 21, 6, 1);
+  }
 
   if (Math.hypot(x - player.x, y - player.y) < 94 || time < visitor.labelUntil) {
-    const name = "Линус Торвальдс";
+    const name = visitor.kind === "elder" ? "Старик" : "Линус Торвальдс";
     const half = Math.ceil(textWidth(name) / 2) + 4;
-    box(ctx, "#192921f5", x - half, y - 40, half * 2, 11);
-    label(ctx, name, x, y - 38, "#f2e3c3");
+    const abovePlayer = visitor.kind === "elder" && Math.abs(x - player.x) < half + 37;
+    const tagY = abovePlayer ? Math.min(y - 40, Math.round(player.y) - 65) : y - 40;
+    box(ctx, "#192921f5", x - half, tagY, half * 2, 11);
+    label(ctx, name, x, tagY + 2, "#f2e3c3");
   }
 }
 

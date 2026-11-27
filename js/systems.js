@@ -161,7 +161,40 @@ const systems = [
       "       ██  ██",
     ],
   },
+  {
+    name: "Debian",
+    os: "Debian GNU/Linux 12 (bookworm) x86_64",
+    kernel: "Linux 6.1.0-31-amd64",
+    packages: "1043 (dpkg)",
+    shell: "bash 5.2.15",
+    desktop: "Xfce 4.18",
+    wm: "Xfwm4 (X11)",
+    terminal: "Xfce Terminal 1.0.4",
+    host: "OptiPlex 7040",
+    cpu: "Intel Core i5-6500 (4) @ 3.60 GHz",
+    gpu: "Intel HD Graphics 530",
+    memory: "1.08 GiB / 7.67 GiB (14%)",
+    uptime: "19 hours, 4 mins",
+    color: "#ee88ad",
+    logo: [
+      "     ▄██████▄",
+      "   ▄█▀      ▀█▄",
+      "  ▄█   ▄██▄   █",
+      "  █   █   ▀█  ▀",
+      "  █   █ ▀▄▄▀",
+      "  ▀█  ▀█▄",
+      "   ▀█▄  ▀▀█▄",
+      "     ▀▀█▄▄",
+    ],
+  },
 ];
+
+const pentium4 = {
+  host: "OptiPlex GX620",
+  cpu: "Intel Pentium 4 650 (2) @ 3.40 GHz",
+  gpu: "Intel 82945G (GMA 950)",
+  memory: "817 MiB / 3.38 GiB (24%)",
+};
 
 export function shuffleSystems() {
   const shuffled = [...systems, ...systems];
@@ -169,7 +202,10 @@ export function shuffleSystems() {
     const other = Math.floor(Math.random() * (index + 1));
     [shuffled[index], shuffled[other]] = [shuffled[other], shuffled[index]];
   }
-  return shuffled;
+  return shuffled.map(system =>
+    (system.name === "Debian" || system.name === "Gentoo") && Math.random() < 0.35
+      ? { ...system, ...pentium4 }
+      : system);
 }
 
 export function createFastfetch(system, hostname, user) {
