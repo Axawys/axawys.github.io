@@ -3,11 +3,14 @@ import { door, height, isWalkable, moveBody, player, width } from "./room.js";
 import { makeField, nearestCell, pursue } from "./navigation.js";
 
 const robotTypes = {
-  spider: { radius: 5, hitRadius: 10, eye: 8, hp: 65, speed: 88, damage: 24, color: "#ff947a" },
-  walker: { radius: 6, hitRadius: 15, eye: 21, hp: 120, speed: 70, damage: 38, color: "#f6c786" },
-  swarm: { radius: 3, hitRadius: 6, eye: 4, hp: 20, speed: 87, damage: 12, color: "#e6ac76" },
-  agent: { radius: 6, hitRadius: 15, eye: 13, hp: 92, speed: 74, damage: 25 },
+  spider: { name: "Паук Ubuntu", radius: 5, hitRadius: 10, eye: 8, maxHp: 110, speed: 88, damage: 24, color: "#ff947a" },
+  walker: { name: "Робот ALT Linux", radius: 6, hitRadius: 15, eye: 21, maxHp: 192, speed: 70, damage: 38, color: "#f6c786" },
+  swarm: { name: "ИИ-агент", radius: 3, hitRadius: 6, eye: 4, maxHp: 44, speed: 87, damage: 12, color: "#e6ac76" },
+  agent: { radius: 6, hitRadius: 15, eye: 13, maxHp: 144, speed: 74, damage: 25 },
 };
+
+const gentooOverheat = 0.65;
+const gentooFire = 0.85;
 
 const swarmMembers = [
   { kind: "agent", name: "Claude Code", color: "#f3ae91", dx: -47, dy: 43 },
@@ -131,7 +134,11 @@ export function createAction(onNotice = () => {}) {
       return;
     }
     station.busy = true;
-    state.pending.push({ event, station, remaining: event === "explosion" ? 0.48 : 0.32 });
+    if (event === "explosion") {
+      state.pending.push({ event, station, phase: "overheat", remaining: gentooOverheat + gentooFire });
+    } else {
+      state.pending.push({ event, station, remaining: 0.32 });
+    }
   }
 
   function finishEvent({ event, station }) {
@@ -153,7 +160,7 @@ export function createAction(onNotice = () => {}) {
       const point = nearFree(x + dx, y + dy, type.radius);
       if (!point) continue;
       const speed = type.speed + (kind === "swarm" ? (index % 4) * 4 - 6 : 0);
-      state.robots.push({ ...type, ...identity, ...point, kind, speed, stride: 0, flash: 0, ready: state.time + 0.45 });
+      state.robots.push({ ...type, ...identity, ...point, kind, speed, hp: type.maxHp, stride: 0, flash: 0, ready: state.time + 0.45 });
     }
     const color = robotTypes[event].color;
     shock(x, y + 16, 43, color, 0.35);
@@ -270,6 +277,7 @@ export function createAction(onNotice = () => {}) {
     for (const event of state.pending) {
       event.remaining -= elapsed;
       if (event.remaining <= 0) finishEvent(event);
+      else if (event.phase === "overheat" && event.remaining <= gentooFire) event.phase = "fire";
     }
     state.pending = state.pending.filter(event => event.remaining > 0);
 

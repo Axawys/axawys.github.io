@@ -1,5 +1,5 @@
 import { box, label, pixels } from "./pixels.js";
-import { drawAgentNames, drawEffects, drawPlayer, drawRobot, drawVisitor, drawWeapon } from "./sprites.js";
+import { drawEffects, drawPlayer, drawRobot, drawRobotTags, drawVisitor, drawWeapon } from "./sprites.js";
 
 export const width = 980;
 export const height = 670;
@@ -157,9 +157,10 @@ export function createRenderer(canvas) {
     context.drawImage(backdrop, 0, 0);
     const layers = [...fixedLayers];
     for (const station of stations) {
+      const hot = action.pending.some(event => event.station === station && event.phase);
       layers.push({
         depth: station.y + 30,
-        draw: () => drawDesk(context, station, station === nearby, visited.has(station.number), time * 1000),
+        draw: () => drawDesk(context, station, station === nearby, visited.has(station.number), time * 1000, hot),
       });
     }
     for (const note of notes) layers.push({ depth: note.y, draw: () => drawNote(context, note, nearby === note, time) });
@@ -172,7 +173,7 @@ export function createRenderer(canvas) {
     for (const layer of layers.sort((a, b) => a.depth - b.depth)) layer.draw(context, time * 1000);
     if (action.armed) drawWeapon(context, player, action.aim, true);
     drawEffects(context, action, time);
-    drawAgentNames(context, action.robots, action.dead ? null : player);
+    drawRobotTags(context, action.robots, action.dead ? null : player, camera);
     context.restore();
   }
   return { camera, follow, worldPoint, screenPoint, draw };
@@ -286,7 +287,7 @@ function drawZone(ctx, x, y, w, h, shade, trim) {
   box(ctx, trim, x, y + 2, 2, h - 4);
   box(ctx, trim, x + w - 2, y + 2, 2, h - 4);
 }
-function drawDesk(ctx, { number, x, y, screen, offline }, near, discovered, time) {
+function drawDesk(ctx, { number, x, y, screen, offline }, near, discovered, time, hot) {
   box(ctx, "#13261db0", x - 33, y + 10, 70, 21);
   box(ctx, "#142820", x - 32, y + 14, 6, 12);
   box(ctx, "#405b4e", x - 31, y + 16, 3, 9);
@@ -305,25 +306,27 @@ function drawDesk(ctx, { number, x, y, screen, offline }, near, discovered, time
     // CRT case, screen and reflections.
     box(ctx, "#283e34", x - 14, y + 6, 30, 5);
     box(ctx, "#1b2b23", x - 16, y - 15, 32, 23);
-    box(ctx, near ? "#9ebaaa" : "#6a8b7e", x - 15, y - 16, 30, 20);
-    box(ctx, "#3d5a4f", x - 15, y + 2, 30, 5);
-    box(ctx, "#a0b4a8", x - 13, y - 15, 25, 1);
-    box(ctx, "#172a23", x - 11, y - 13, 22, 14);
-    box(ctx, "#254739", x - 9, y - 11, 18, 10);
-    box(ctx, screen, x - 7, y - 9, 2, 1);
-    box(ctx, screen, x - 5, y - 8, 1, 1);
-    box(ctx, screen, x - 7, y - 7, 2, 1);
-    if (time % 1100 < 700) box(ctx, screen, x - 3, y - 6, 3, 1);
-    box(ctx, "#426f57", x + 2, y - 3, 6, 1);
-    box(ctx, discovered ? "#baffbe" : screen, x + 10, y + 4, 2, 1);
+    const casing = hot ? "#bc443e" : near ? "#9ebaaa" : "#6a8b7e";
+    const phosphor = hot ? "#ffb3a0" : screen;
+    box(ctx, casing, x - 15, y - 16, 30, 20);
+    box(ctx, hot ? "#793230" : "#3d5a4f", x - 15, y + 2, 30, 5);
+    box(ctx, hot ? "#f98d77" : "#a0b4a8", x - 13, y - 15, 25, 1);
+    box(ctx, hot ? "#4c211f" : "#172a23", x - 11, y - 13, 22, 14);
+    box(ctx, hot ? "#8c302d" : "#254739", x - 9, y - 11, 18, 10);
+    box(ctx, phosphor, x - 7, y - 9, 2, 1);
+    box(ctx, phosphor, x - 5, y - 8, 1, 1);
+    box(ctx, phosphor, x - 7, y - 7, 2, 1);
+    if (time % 1100 < 700) box(ctx, phosphor, x - 3, y - 6, 3, 1);
+    box(ctx, hot ? "#d45a4d" : "#426f57", x + 2, y - 3, 6, 1);
+    box(ctx, discovered && !hot ? "#baffbe" : phosphor, x + 10, y + 4, 2, 1);
 
-    // Tower, keyboard, mouse and a nameplate.
+    // Tower case and status light.
     const tower = x + (number % 2 ? 20 : -29);
     box(ctx, "#202e29", tower - 1, y - 3, 11, 14);
-    box(ctx, "#53685d", tower, y - 5, 9, 13);
-    box(ctx, "#3a5147", tower + 1, y, 7, 9);
+    box(ctx, hot ? "#9c3f36" : "#53685d", tower, y - 5, 9, 13);
+    box(ctx, hot ? "#793230" : "#3a5147", tower + 1, y, 7, 9);
     box(ctx, "#202f27", tower + 2, y + 1, 5, 2);
-    box(ctx, "#91dfa8", tower + 2, y + 5, 1, 1);
+    box(ctx, hot ? phosphor : "#91dfa8", tower + 2, y + 5, 1, 1);
   } else {
     box(ctx, "#27382f", x - 14, y - 4, 28, 10);
     box(ctx, "#354c3e", x - 9, y - 2, 19, 6);

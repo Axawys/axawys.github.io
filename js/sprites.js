@@ -1,5 +1,7 @@
 import { box, gunRay, label, line, pixels } from "./pixels.js";
 
+const robotTopOffset = { swarm: 10, spider: 17, agent: 26, walker: 33 };
+
 export function drawPlayer(ctx, player, action, time) {
   const x = Math.round(player.x);
   const y = Math.round(player.y);
@@ -108,27 +110,57 @@ export function drawRobot(ctx, robot, time) {
   }
 }
 
-export function drawAgentNames(ctx, robots, livingPlayer) {
-  const tags = [];
-  const occupied = livingPlayer ? [{ x: livingPlayer.x, y: livingPlayer.y - 36, half: 17 }] : [];
-  for (const robot of robots) {
-    if (!robot.name) continue;
-    const x = Math.round(robot.x);
-    const anchor = Math.round(robot.y) - 27;
-    const half = Math.ceil((robot.name.length * 5 + 8) / 2);
-    let y = anchor - 14;
-    let overlap;
-    while ((overlap = occupied.find(tag => Math.abs(tag.x - x) < tag.half + half && Math.abs(tag.y - y) < 12))) {
-      y = overlap.y - 12;
+function findTagPosition(occupied, view, anchorX, anchorY, feetY, half, height) {
+  const clampX = x => Math.max(view.left + half, Math.min(view.right - half, x));
+  const clampY = y => Math.max(view.top, Math.min(view.bottom - height, y));
+  const center = clampX(anchorX);
+  const above = clampY(anchorY - height - 3);
+  const below = clampY(feetY + 5);
+  const columns = [center, clampX(anchorX - half - 5), clampX(anchorX + half + 5)];
+  for (let offset = 0; above - offset >= view.top || below + offset + height <= view.bottom; offset += height + 2) {
+    for (const y of [above - offset, below + offset]) {
+      if (y < view.top || y + height > view.bottom) continue;
+      for (const x of columns) {
+        const overlap = occupied.some(tag => Math.abs(tag.x - x) < tag.half + half + 2
+          && tag.y < y + height + 2 && y < tag.y + tag.height + 2);
+        if (!overlap) return { x, y };
+      }
     }
-    const tag = { x, y, anchor, half, robot };
+  }
+  return { x: center, y: above };
+}
+
+export function drawRobotTags(ctx, robots, livingPlayer, camera) {
+  if (!robots.length) return;
+  const left = Math.round(camera.x);
+  const top = Math.round(camera.y);
+  const view = { left: left + 3, right: left + camera.w - 3, top: top + 3, bottom: top + camera.h - 3 };
+  const tags = [];
+  const occupied = livingPlayer ? [{ x: livingPlayer.x, y: livingPlayer.y - 36, half: 17, height: 12 }] : [];
+  for (const robot of robots) {
+    if (robot.x < left - 12 || robot.x > view.right + 15 || robot.y < top || robot.y > view.bottom + 33) continue;
+    const size = robot.kind === "swarm" ? 7 : 8;
+    const anchorX = Math.round(robot.x);
+    const feetY = Math.round(robot.y);
+    const anchorY = feetY - robotTopOffset[robot.kind];
+    const half = Math.ceil(robot.name.length * size * 0.3) + 4;
+    const height = size + 7;
+    const { x, y } = findTagPosition(occupied, view, anchorX, anchorY, feetY, half, height);
+    const tag = { x, y, anchorX, anchorY, feetY, half, size, height, robot };
     tags.push(tag);
     occupied.push(tag);
   }
-  for (const { x, y, anchor, robot } of tags) line(ctx, robot.color, x, y + 10, x, anchor);
-  for (const { x, y, half, robot } of tags) {
-    box(ctx, "#17251fe8", x - half, y, 2 * half, 11);
-    label(ctx, robot.name, x, y + 1, robot.color, 8);
+  for (const { x, y, height, anchorX, anchorY, feetY, robot } of tags) {
+    const above = y < anchorY;
+    line(ctx, robot.color + "79", x, above ? y + height : y, anchorX, above ? anchorY : feetY + 2);
+  }
+  for (const { x, y, half, size, height, robot } of tags) {
+    const barWidth = robot.kind === "swarm" ? 18 : 30;
+    const barLeft = x - barWidth / 2;
+    box(ctx, "#17251ff0", x - half, y, 2 * half, height);
+    label(ctx, robot.name, x, y + 1, robot.color, size);
+    box(ctx, "#634442", barLeft, y + height - 5, barWidth, 3);
+    box(ctx, "#ee8a75", barLeft, y + height - 5, Math.ceil(barWidth * robot.hp / robot.maxHp), 3);
   }
 }
 
@@ -154,8 +186,35 @@ export function drawVisitor(ctx, visitor, time, player) {
   }
 }
 
+function drawGentooFire(ctx, x, y, time) {
+  const glow = ctx.createRadialGradient(x, y - 14, 1, x, y - 14, 52);
+  glow.addColorStop(0, "#ff9f496e");
+  glow.addColorStop(1, "#f36f2800");
+  box(ctx, glow, x - 52, y - 66, 104, 104);
+  const frame = Math.floor(time * 14);
+  for (let i = 0; i < 7; i++) {
+    const left = x - 17 + i * 5;
+    const base = y + 2 - Math.abs(i - 3);
+    const flame = 12 + (3 - Math.abs(i - 3)) * 4 + (frame * (i % 3 + 1) + i * 3) % 9;
+    box(ctx, "#b64b32", left, base - flame + 3, 5, flame - 3);
+    box(ctx, "#ec7137", left + 1, base - flame, 3, flame);
+    box(ctx, "#fbb55f", left + 1, base - Math.floor(flame * 0.68), 4, Math.floor(flame * 0.68));
+    box(ctx, "#fff0b4", left + 2, base - Math.floor(flame * 0.4), 2, Math.floor(flame * 0.4));
+    pixels(ctx, "#ffc576", left + (i % 3), base - flame - 3 - frame % 5, 2);
+  }
+  for (let i = 0; i < 4; i++) {
+    const rise = (frame + i * 6) % 22;
+    box(ctx, "#53504bb0", x - 9 + i * 5 + Math.floor(rise / 4), y - 28 - rise, 4 + i, 3 + i);
+  }
+}
+
 export function drawEffects(ctx, action, time) {
-  for (const { station, remaining } of action.pending) {
+  for (const { station, remaining, phase: heat } of action.pending) {
+    if (heat === "fire") {
+      drawGentooFire(ctx, station.x, station.y, time);
+      continue;
+    }
+    if (heat === "overheat") continue;
     const pulse = Math.round((1 - remaining) * 6);
     const phase = Math.round(time * 25) % 3;
     box(ctx, "#ffab6140", station.x - 12, station.y - 13, 24, 15);
