@@ -61,6 +61,7 @@ let nearby;
 let previousTime;
 let pointer;
 let shootingPointer;
+let canvasPressArmed = false;
 let shotRequest;
 let interactionKeyHeld = false;
 
@@ -96,7 +97,7 @@ function closeNote() {
 function resetInput() {
   keys.clear();
   directions.clear();
-  shootingPointer = undefined;
+  stopShooting();
   shotRequest = undefined;
   interactionKeyHeld = false;
 }
@@ -163,12 +164,21 @@ for (const button of document.querySelectorAll("[data-direction]")) {
 
 function aim(event) {
   if (event.pointerType === "touch" && event.pointerId !== shootingPointer) return;
-  pointer = { x: event.clientX, y: event.clientY };
+  pointer = { x: event.clientX, y: event.clientY, type: event.pointerType };
+}
+
+function stopShooting() {
+  if (shootingPointer === undefined) return;
+  if (canvas.hasPointerCapture(shootingPointer)) canvas.releasePointerCapture(shootingPointer);
+  shootingPointer = undefined;
+  if (pointer?.type === "touch") pointer = undefined;
 }
 
 canvas.addEventListener("pointermove", aim);
 canvas.addEventListener("pointerdown", event => {
-  if (event.button !== 0 || !action.state.armed || action.state.dead || shootingPointer !== undefined) return;
+  if (event.button !== 0) return;
+  canvasPressArmed = action.state.armed;
+  if (!canvasPressArmed || shootingPointer !== undefined) return;
   shootingPointer = event.pointerId;
   canvas.setPointerCapture(event.pointerId);
   aim(event);
@@ -184,7 +194,7 @@ for (const type of ["pointerup", "pointercancel", "pointerleave", "lostpointerca
   canvas.addEventListener(type, releaseAim);
 }
 canvas.addEventListener("click", event => {
-  if (action.state.armed || !nearby) return;
+  if (canvasPressArmed || action.state.armed || !nearby) return;
   const point = renderer.worldPoint(event.clientX, event.clientY);
   if (Math.abs(point.x - nearby.x) < 34 && Math.abs(point.y - nearby.y) < 33) interact();
 });
@@ -210,6 +220,7 @@ function frame(time) {
   }
   const respawned = !paused && action.update(elapsed, shootingPointer !== undefined || Boolean(shotRequest));
   shotRequest = undefined;
+  if (!action.state.armed) stopShooting();
   if (respawned) {
     resetInput();
     renderer.follow(elapsed, true);
@@ -217,7 +228,7 @@ function frame(time) {
   updateInteraction(paused);
   if (health.value !== String(player.hp)) health.value = String(player.hp);
   if (death.hidden === action.state.dead) death.hidden = !action.state.dead;
-  canvas.classList.toggle("armed", action.state.armed && !action.state.dead);
+  canvas.classList.toggle("armed", action.state.armed);
   renderer.draw({ nearby, visited: terminal.visited, notes, action: action.state, time: action.state.time });
   requestAnimationFrame(frame);
 }

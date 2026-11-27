@@ -24,7 +24,8 @@ export function createAction() {
   const state = {
     time: 0, aim: { x: player.x, y: player.y - 48, visible: false },
     robots: [], particles: [], shocks: [], shots: [], pending: [], visitor: null,
-    armed: false, dead: false, invulnerable: 0, shake: 0,
+    dead: false, invulnerable: 0, shake: 0,
+    get armed() { return !this.dead && this.robots.length > 0; },
   };
   let reviveIn = 0;
   let reload = 0;
@@ -141,7 +142,6 @@ export function createAction() {
     shock(x, y + 16, 43, kind.color, 0.35);
     burst(x, y + 5, [kind.color, "#efcd9d", "#8c6b5d"], count * 5 + 20, 116);
     state.shake = Math.max(0.27, state.shake);
-    if (event === "spider") state.armed = true;
   }
 
   function advanceVisitor(elapsed) {

@@ -167,10 +167,10 @@ export function createRenderer(canvas) {
     if (action.visitor) layers.push({ depth: action.visitor.y, draw: () => drawVisitor(context, action.visitor, time, player) });
     layers.push({ depth: player.y, draw: () => {
       drawPlayer(context, player, action, time);
-      if (!action.dead && action.armed) drawWeapon(context, player, action.aim, false);
+      if (action.armed) drawWeapon(context, player, action.aim, false);
     } });
     for (const layer of layers.sort((a, b) => a.depth - b.depth)) layer.draw(context, time * 1000);
-    if (!action.dead && action.armed) drawWeapon(context, player, action.aim, true);
+    if (action.armed) drawWeapon(context, player, action.aim, true);
     drawEffects(context, action, time);
     context.restore();
   }
