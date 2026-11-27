@@ -6,14 +6,17 @@ export const height = 670;
 export const door = { x: 490, y: 629 };
 const floor = { left: 15, right: width - 15, top: 49, bottom: 638 };
 
-export const stations = [
-  { number: 1, x: 153, y: 117, screen: "#80dbc1", hintSide: 1 },
-  { number: 2, x: 459, y: 112, screen: "#b4a6e2", hintSide: 1 },
-  { number: 3, x: 804, y: 133, screen: "#83bedc", hintSide: -1 },
-  { number: 4, x: 152, y: 418, screen: "#91d7ad", hintSide: 1 },
-  { number: 5, x: 813, y: 410, screen: "#e0bd84", hintSide: -1 },
-  { number: 6, x: 620, y: 261, screen: "#8faadd", hintSide: 1 },
+const deskColumns = [307, 429, 551, 673];
+const deskRows = [
+  { y: 119, title: "QA", shade: "#47675935", trim: "#5c7b6480", glow: "#89d0a532" },
+  { y: 221, title: "DEVELOPMENT", shade: "#5c586e30", trim: "#7b718477", glow: "#b2a7e02b" },
+  { y: 323, title: "PACKAGES", shade: "#4e647b42", trim: "#6c8ca684", glow: "#8db9ed32" },
 ];
+const screens = ["#80dbc1", "#b4a6e2", "#83bedc", "#91d7ad", "#e0bd84", "#8faadd"];
+export const stations = deskRows.flatMap(({ y }, row) => deskColumns.map((x, column) => {
+  const number = row * deskColumns.length + column + 1;
+  return { number, id: "PC-" + String(number).padStart(2, "0"), x, y, screen: screens[(number - 1) % screens.length], hintSide: 1 };
+}));
 
 export const player = { x: 490, y: 471, facing: "north", moving: false, stride: 0, hp: 100, radius: 4 };
 export const noteSpots = [
@@ -28,17 +31,17 @@ function item(kind, x, y, box) {
 const furniture = [
   item("rack", 57, 111, [-13, -13, 13, 15]),
   item("rack", 82, 111, [-13, -13, 13, 15]),
-  item("shelf", 260, 114, [-35, -7, 35, 18]),
-  item("partition", 215, 248, [-82, -4, 82, 8]),
-  item("partition", 768, 253, [-83, -4, 83, 8]),
-  item("shelf", 555, 116, [-35, -7, 35, 18]),
+  item("shelf", 211, 114, [-35, -7, 35, 18]),
+  item("partition", 186, 248, [-82, -4, 82, 8]),
+  item("partition", 808, 253, [-83, -4, 83, 8]),
+  item("shelf", 759, 116, [-35, -7, 35, 18]),
   item("rack", 882, 122, [-13, -13, 13, 15]),
   item("rack", 908, 122, [-13, -13, 13, 15]),
   item("rack", 933, 122, [-13, -13, 13, 15]),
   item("crate", 895, 180, [-10, -5, 12, 10]),
   item("crate", 917, 180, [-10, -5, 12, 10]),
-  item("plant", 336, 125, [-7, -2, 7, 7]),
-  item("plant", 635, 128, [-7, -2, 7, 7]),
+  item("plant", 250, 143, [-7, -2, 7, 7]),
+  item("plant", 815, 150, [-7, -2, 7, 7]),
   item("plant", 102, 251, [-7, -2, 7, 7]),
   item("plant", 877, 254, [-7, -2, 7, 7]),
   item("crate", 57, 324, [-10, -5, 12, 10]),
@@ -225,32 +228,33 @@ function drawOffice(ctx) {
   box(ctx, "#12271c30", 10, 50, width - 20, 7);
 
   for (const [x, y, w, h, shade, trim] of [
-    [40, 82, 282, 124, "#47675935", "#5c7b6480"],
-    [382, 77, 218, 119, "#5c586e30", "#7b718477"],
-    [740, 93, 205, 106, "#47667842", "#608a9d88"],
+    [40, 82, 226, 124, "#47675935", "#5c7b6480"],
+    [756, 93, 189, 106, "#47667842", "#608a9d88"],
     [46, 367, 226, 167, "#5c6d463f", "#81895680"],
     [744, 369, 212, 163, "#66594245", "#927e5585"],
-    [558, 233, 131, 110, "#4e647b42", "#6c8ca684"],
     [301, 419, 510, 112, "#5c665125", "#7b85604d"],
   ]) drawZone(ctx, x, y, w, h, shade, trim);
+  for (const { y, title, shade, trim } of deskRows) {
+    drawZone(ctx, 259, y - 33, 494, 99, shade, trim);
+    label(ctx, title, 490, y + 53, "#b4c8a993", 9);
+  }
 
   for (const x of [455, 524]) {
-    for (let y = 269; y < 623; y += 12) box(ctx, "#78906d88", x, y, 2, 5);
+    for (let y = 411; y < 623; y += 12) box(ctx, "#78906d88", x, y, 2, 5);
   }
-  for (const y of [293, 345]) {
+  for (const y of [191, 293, 395]) {
     for (let x = 34; x < 948; x += 15) {
       if (x < 443 || x > 536) box(ctx, "#6f866b65", x, y, 6, 2);
     }
   }
   for (const [x, y, text] of [
-    [156, 220, "01 / QA"], [466, 208, "02 / DEVELOPMENT"], [820, 220, "03 / NETWORK"],
-    [158, 547, "04 / BUILD"], [827, 547, "05 / OPERATIONS"], [620, 351, "06 / PACKAGES"],
-    [490, 388, "BREAK AREA"], [490, 609, "EXIT"],
+    [143, 211, "ARCHIVES"], [847, 211, "NETWORK"],
+    [158, 547, "SUPPLIES"], [827, 547, "OPERATIONS"], [490, 422, "BREAK AREA"], [490, 609, "EXIT"],
   ]) label(ctx, text, x, y, "#b4c8a993", 9);
 
   for (const [x, y, shade] of [
-    [152, 118, "#89d0a532"], [459, 113, "#b2a7e02b"], [815, 141, "#87bdcf35"],
-    [152, 418, "#88bc7930"], [813, 410, "#e4c58630"], [620, 261, "#8db9ed32"], [490, 453, "#d7d5a740"],
+    ...deskRows.flatMap(({ y, glow }) => [[366, y, glow], [610, y, glow]]),
+    [152, 118, "#89d0a532"], [815, 141, "#87bdcf35"], [490, 453, "#d7d5a740"],
     [490, 635, "#bdcda22b"],
   ]) {
     const glow = ctx.createRadialGradient(x, y, 1, x, y, 104);
@@ -291,7 +295,7 @@ function drawZone(ctx, x, y, w, h, shade, trim) {
   box(ctx, trim, x, y + 2, 2, h - 4);
   box(ctx, trim, x + w - 2, y + 2, 2, h - 4);
 }
-function drawDesk(ctx, { number, x, y, screen, offline }, near, discovered, time, hot) {
+function drawDesk(ctx, { number, id, x, y, screen, offline }, near, discovered, time, hot) {
   box(ctx, "#13261db0", x - 33, y + 10, 70, 21);
   box(ctx, "#142820", x - 32, y + 14, 6, 12);
   box(ctx, "#405b4e", x - 31, y + 16, 3, 9);
@@ -343,7 +347,7 @@ function drawDesk(ctx, { number, x, y, screen, offline }, near, discovered, time
   box(ctx, "#182d23", x - 31, y + 11, 9, 1);
   box(ctx, "#192d23", x - 13, y + 16, 26, 10);
   box(ctx, near ? "#355d45" : "#2a4638", x - 12, y + 17, 24, 8);
-  label(ctx, `PC-0${number}`, x, y + 17, near ? "#c5f1d2" : "#afd0bc");
+  label(ctx, id, x, y + 17, near ? "#c5f1d2" : "#afd0bc");
 
   box(ctx, "#162a21", x - 8, y + 26, 16, 8);
   box(ctx, "#395346", x - 6, y + 26, 12, 3);

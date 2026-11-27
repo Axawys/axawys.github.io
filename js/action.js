@@ -54,6 +54,7 @@ export function createAction(onNotice = () => {}) {
   const arsenal = createWeapons(state, player, burst, shock);
   let playerCell = -1;
   let playerField;
+  const queuedVisitors = [];
   const doorField = makeField(nearestCell(door.x, door.y));
 
   function burst(x, y, colors, count, force, smoke = false) {
@@ -133,7 +134,8 @@ export function createAction(onNotice = () => {}) {
 
   function trigger(event, station, view) {
     if (event === "visitor") {
-      callVisitor(view);
+      if (state.visitor) queuedVisitors.push(view);
+      else callVisitor(view);
       return;
     }
     station.busy = true;
@@ -178,7 +180,10 @@ export function createAction(onNotice = () => {}) {
     if (!visitor) return;
     if (visitor.phase === "exit") {
       visitor.y += 101 * elapsed;
-      if (visitor.y > height + 28) state.visitor = null;
+      if (visitor.y > height + 28) {
+        state.visitor = null;
+        if (queuedVisitors.length) callVisitor(queuedVisitors.shift());
+      }
     } else {
       const { target, field } = visitor;
       const distance = Math.hypot(visitor.x - target.x, visitor.y - target.y);

@@ -1,4 +1,5 @@
 import { createAction } from "./action.js";
+import { createAchievements } from "./achievements.js";
 import { createRenderer, movePlayer, nearestInteraction, noteSpots, player, stations } from "./room.js";
 import { drawWeaponIcon } from "./sprites.js";
 import { shuffleSystems } from "./systems.js";
@@ -30,9 +31,11 @@ const notes = [note, ...stations.map((station, index) => ({
 
 const renderer = createRenderer(canvas);
 const action = createAction(showNotice);
+const achievements = createAchievements(tasks, () => canvas.focus({ preventScroll: true }));
 const terminal = createTerminal(stations, systems, (task, station) => {
   taskRows.get(task).classList.add("done");
   action.trigger(task.event, station, renderer.camera);
+  achievements.unlock(task);
 });
 
 const slotButtons = weapons.map((weapon, index) => {
@@ -114,7 +117,7 @@ let shotRequest;
 let interactionKeyHeld = false;
 
 function interact() {
-  if (action.state.dead || terminal.isOpen || noteDialog.open) return false;
+  if (action.state.dead || terminal.isOpen || noteDialog.open || achievements.isOpen) return false;
   const target = nearestInteraction(notes);
   if (!target) return false;
 
@@ -129,7 +132,7 @@ function openNote(target) {
   noteList.hidden = Boolean(hint);
   byId("note-controls").hidden = Boolean(hint);
   hintPanel.hidden = !hint;
-  byId("note-title").textContent = hint ? "Подсказка для PC-0" + target.station.number : "Список дел";
+  byId("note-title").textContent = hint ? "Подсказка для " + target.station.id : "Список дел";
   if (hint) {
     byId("hint-task").textContent = hint.title;
     byId("hint-command").replaceChildren(commandSequence(hint));
@@ -140,6 +143,11 @@ function openNote(target) {
 function closeNote() {
   noteDialog.close();
   canvas.focus({ preventScroll: true });
+}
+
+function toggleAchievements() {
+  if (!achievements.isOpen) resetInput();
+  achievements.toggle();
 }
 
 function resetInput() {
@@ -166,6 +174,7 @@ function updateInteraction(paused) {
 }
 
 interactButton.addEventListener("click", interact);
+byId("open-achievements").addEventListener("click", toggleAchievements);
 byId("close-note").addEventListener("click", closeNote);
 noteDialog.addEventListener("cancel", event => {
   event.preventDefault();
@@ -181,7 +190,13 @@ window.addEventListener("keydown", event => {
     terminal.handleKey(event);
     return;
   }
-  if (noteDialog.open || action.state.dead || event.altKey || event.ctrlKey || event.metaKey) return;
+  if (noteDialog.open || event.altKey || event.ctrlKey || event.metaKey) return;
+  if (event.code === "KeyO") {
+    event.preventDefault();
+    if (!event.repeat) toggleAchievements();
+    return;
+  }
+  if (achievements.isOpen || action.state.dead) return;
   const weaponKey = /^(?:Digit|Numpad)([1-5])$/.exec(event.code);
   if (weaponKey && action.state.armed) {
     event.preventDefault();
@@ -208,7 +223,7 @@ document.addEventListener("visibilitychange", () => {
 });
 
 byId("game").addEventListener("wheel", event => {
-  if (!action.state.armed || terminal.isOpen || noteDialog.open || event.ctrlKey || !event.deltaY) return;
+  if (!action.state.armed || terminal.isOpen || noteDialog.open || achievements.isOpen || event.ctrlKey || !event.deltaY) return;
   event.preventDefault();
   action.cycleWeapon(event.deltaY);
 }, { passive: false });
@@ -266,7 +281,7 @@ function frame(time) {
   const frameElapsed = previousTime === undefined ? 0 : (time - previousTime) / 1000;
   const elapsed = Math.min(frameElapsed, 0.033);
   previousTime = time;
-  const paused = terminal.isOpen || noteDialog.open;
+  const paused = terminal.isOpen || noteDialog.open || achievements.isOpen;
   const canMove = !paused && !action.state.dead;
   const pressed = new Set([...keys, ...directions.values()]);
   const dx = Number(pressed.has("KeyD") || pressed.has("ArrowRight")) - Number(pressed.has("KeyA") || pressed.has("ArrowLeft"));

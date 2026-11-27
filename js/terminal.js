@@ -15,7 +15,7 @@ export function createTerminal(stations, systems, onMaintenance) {
 
   const sessions = stations.map((station, index) => {
     const system = systems[index];
-    const id = "PC-" + String(station.number).padStart(2, "0");
+    const id = station.id;
     const intro = document.createElement("p");
     intro.className = "terminal-intro";
     const command = document.createElement("code");
