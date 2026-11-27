@@ -15,7 +15,7 @@
 </head>
 <body>
   <main class="game" id="game">
-    <canvas id="room" tabindex="0" aria-label="Офис Linux Lab. Двигайтесь на WASD или стрелках. Нажмите E рядом с компьютером или запиской, O открывает достижения, P ставит игру на паузу."></canvas>
+    <canvas id="room" tabindex="0" aria-label="Офис Linux Lab. Двигайтесь на WASD или стрелках. Нажмите E рядом с компьютером или запиской, O открывает достижения, Esc ставит игру на паузу."></canvas>
     <button class="interact" id="interact" type="button" hidden><kbd aria-hidden="true">E</kbd><span></span></button>
     <div id="move-joystick" class="move-joystick" aria-hidden="true" hidden><span></span></div>
     <div class="touch-menu">
@@ -53,7 +53,7 @@
       </div>
       <div>
         <dt>Пауза</dt>
-        <dd><kbd>P</kbd><span class="guide-keyboard"> — пауза или продолжение игры</span><span class="guide-touch-inline"> или кнопка «Пауза» внизу</span></dd>
+        <dd><kbd>Esc</kbd><span class="guide-keyboard"> — пауза или продолжение игры</span><span class="guide-touch-inline"> или кнопка «Пауза» внизу</span></dd>
       </div>
     </dl>
     <button id="start-game" type="button" autofocus>Играть</button>
@@ -69,6 +69,18 @@
     <progress id="achievement-progress" aria-label="Открытые достижения"></progress>
     <p id="achievement-empty" class="achievement-empty" hidden>Здесь появятся открытые достижения.</p>
     <ul id="achievement-list" class="achievement-list"></ul>
+    <footer id="pause-actions" class="pause-actions" hidden>
+      <button type="button" id="reset-progress" class="danger-button">Сбросить прогресс</button>
+    </footer>
+  </dialog>
+
+  <dialog id="reset-progress-dialog" class="reset-dialog" aria-labelledby="reset-title" aria-describedby="reset-message">
+    <h2 id="reset-title">Сбросить прогресс?</h2>
+    <p id="reset-message">Сохранённые достижения будут удалены. Начнётся новая игра.</p>
+    <form method="dialog">
+      <button type="submit" autofocus>Отмена</button>
+      <button type="button" id="confirm-reset-progress" class="danger-button">Сбросить</button>
+    </form>
   </dialog>
 
   <dialog id="note" class="note" aria-labelledby="note-title">

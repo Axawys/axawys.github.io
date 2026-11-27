@@ -208,6 +208,10 @@ noteDialog.addEventListener("cancel", event => {
 });
 
 window.addEventListener("keydown", event => {
+  if (event.key === "Escape" && event.repeat) {
+    event.preventDefault();
+    return;
+  }
   if (event.code === "KeyE" && event.repeat && interactionKeyHeld) {
     event.preventDefault();
     return;
@@ -224,9 +228,14 @@ window.addEventListener("keydown", event => {
     }
     return;
   }
-  if (event.code === "KeyO" || event.code === "KeyP") {
+  if (event.key === "Escape" && !achievements.isOpen) {
     event.preventDefault();
-    if (!event.repeat) toggleAchievements(event.code === "KeyP");
+    toggleAchievements(true);
+    return;
+  }
+  if (event.code === "KeyO") {
+    event.preventDefault();
+    if (!event.repeat) toggleAchievements();
     return;
   }
   if (achievements.isOpen || action.state.dead) return;

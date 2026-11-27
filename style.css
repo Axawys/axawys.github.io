@@ -58,8 +58,8 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
   @keyframes achievement-enter { from { opacity: 0; transform: translateX(8px); } }
 }
 
-.achievement-wall, .controls-dialog { width: min(580px, calc(100% - 24px)); max-height: calc(100% - 24px); padding: clamp(14px, 4vw, 25px); border: 2px solid #6b7d66; color: #edf2e6; background: #23342a; box-shadow: inset 0 3px #4e654f, inset 0 -5px #18271f, 0 5px #111c17; }
-.achievement-wall::backdrop, .controls-dialog::backdrop { background: #080f0bd0; }
+.achievement-wall, .controls-dialog, .reset-dialog { width: min(580px, calc(100% - 24px)); max-height: calc(100% - 24px); padding: clamp(14px, 4vw, 25px); border: 2px solid #6b7d66; color: #edf2e6; background: #23342a; box-shadow: inset 0 3px #4e654f, inset 0 -5px #18271f, 0 5px #111c17; }
+.achievement-wall::backdrop, .controls-dialog::backdrop, .reset-dialog::backdrop { background: #080f0bd0; }
 .controls-dialog { width: min(490px, calc(100% - 28px)); }
 .controls-dialog h2 { font: 800 1.45rem var(--mono); }
 .control-guide { display: grid; gap: 10px; margin: 15px 0 18px; }
@@ -71,11 +71,18 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 #start-game { width: 100%; min-height: 42px; border: 1px solid #b5e0ae; color: #1c2d21; background: #9bd5a8; box-shadow: inset 0 -4px #79b08b; font: 800 .94rem var(--mono); }
 #start-game:hover { background: #b2e4b8; }
 .achievement-wall header { display: flex; justify-content: space-between; align-items: center; gap: 9px; margin-bottom: 17px; }
-.achievement-wall h2 { font: 800 clamp(1.03rem, 5vw, 1.42rem) var(--mono); }
+.achievement-wall h2, .reset-dialog h2 { font: 800 clamp(1.03rem, 5vw, 1.42rem) var(--mono); }
 .achievement-wall h3 { margin: 0 0 8px; font: 700 .95rem var(--mono); }
-.achievement-wall button { display: inline-flex; align-items: center; gap: 5px; padding: 4px 7px; border: 1px solid #728572; color: #eef4e8; background: #344b3b; font-size: .8rem; }
-.achievement-wall button:hover { background: #496451; }
+.achievement-wall button, .reset-dialog button { display: inline-flex; align-items: center; gap: 5px; padding: 4px 7px; border: 1px solid #728572; color: #eef4e8; background: #344b3b; font-size: .8rem; }
+.achievement-wall button:hover, .reset-dialog button:hover { background: #496451; }
 .achievement-wall button kbd { min-width: 19px; min-height: 19px; padding-inline: 3px; }
+.pause-actions { display: flex; justify-content: flex-end; margin-top: 16px; padding-top: 12px; border-top: 1px solid #495f50; }
+.achievement-wall .danger-button, .reset-dialog .danger-button { border-color: #b7826f; color: #ffded2; background: #52372e; }
+.achievement-wall .danger-button:hover, .reset-dialog .danger-button:hover { background: #714738; }
+.pause-actions button, .reset-dialog button { min-height: 38px; padding-inline: 10px; }
+.reset-dialog { width: min(390px, calc(100% - 28px)); }
+.reset-dialog p { margin: 12px 0 18px; color: #d4e0d4; font-size: .9rem; line-height: 1.45; }
+.reset-dialog form { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
 #achievement-summary { color: #f3daa1; font: 700 .85rem var(--mono); }
 #achievement-progress { display: block; width: 100%; height: 9px; margin: 7px 0 15px; border: 1px solid #566a54; border-radius: 0; appearance: none; accent-color: #e9c675; background: #15251c; }
 #achievement-progress::-webkit-progress-bar { background: #15251c; }

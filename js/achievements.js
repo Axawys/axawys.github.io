@@ -1,4 +1,5 @@
 const storagePrefix = "linux-lab:achievement:";
+const resetStorageKey = "linux-lab:progress-reset";
 
 function saved(event) {
   try {
@@ -20,7 +21,9 @@ export function createAchievements(tasks, restoreFocus) {
   const dialog = document.getElementById("achievements");
   const heading = document.getElementById("achievement-title");
   const pauseHeading = document.getElementById("pause-achievements");
+  const pauseActions = document.getElementById("pause-actions");
   const closeButton = document.getElementById("close-achievements");
+  const resetDialog = document.getElementById("reset-progress-dialog");
   const list = document.getElementById("achievement-list");
   const empty = document.getElementById("achievement-empty");
   const summary = document.getElementById("achievement-summary");
@@ -83,23 +86,41 @@ export function createAchievements(tasks, restoreFocus) {
   }
 
   function toggle(pause = false) {
+    if (resetDialog.open) return;
     if (dialog.open) {
       close();
       return;
     }
     heading.textContent = pause ? "Пауза" : "Достижения";
     pauseHeading.hidden = !pause;
-    closeButton.querySelector("kbd").textContent = pause ? "P" : "O";
+    pauseActions.hidden = !pause;
+    closeButton.querySelector("kbd").textContent = pause ? "Esc" : "O";
     closeButton.querySelector("span").textContent = pause ? "Продолжить" : "Закрыть";
     dialog.showModal();
   }
 
   closeButton.addEventListener("click", close);
+  document.getElementById("reset-progress").addEventListener("click", () => resetDialog.showModal());
+  document.getElementById("confirm-reset-progress").addEventListener("click", () => {
+    try {
+      for (const key of Object.keys(localStorage)) {
+        if (key.startsWith(storagePrefix)) localStorage.removeItem(key);
+      }
+      localStorage.setItem(resetStorageKey, String(Date.now()));
+    } catch {
+      // Reloading still clears progress made in this session if storage is unavailable.
+    }
+    window.location.reload();
+  });
   dialog.addEventListener("cancel", event => {
     event.preventDefault();
     close();
   });
   window.addEventListener("storage", event => {
+    if (event.key === resetStorageKey && event.newValue !== null) {
+      window.location.reload();
+      return;
+    }
     if (event.newValue !== "1" || !event.key?.startsWith(storagePrefix)) return;
     const id = event.key.slice(storagePrefix.length);
     if (!cards.has(id) || unlocked.has(id)) return;
