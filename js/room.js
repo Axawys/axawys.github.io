@@ -2,23 +2,25 @@ import { label } from "./pixel-font.js";
 import { box, pixels } from "./pixels.js";
 import { drawBlastZones, drawEffects, drawPlayer, drawRobot, drawRobotTags, drawVisitor, drawWeapon } from "./sprites.js";
 
-export const width = 980;
-export const height = 670;
-export const door = { x: 490, y: 629 };
-const floor = { left: 15, right: width - 15, top: 49, bottom: 638 };
+export const width = 1220;
+export const height = 822;
+const centerX = width / 2;
+const floor = { left: 15, right: width - 15, top: 49, bottom: height - 32 };
+export const door = { x: centerX, y: floor.bottom - 9 };
+export const playerStart = { x: centerX, y: 598 };
 
-const deskColumns = [307, 429, 551, 673];
-const deskRows = [119, 221, 323];
+const deskColumns = [326, 506, 686, 866];
+const deskRows = [126, 270, 414];
 const screens = ["#80dbc1", "#b4a6e2", "#83bedc", "#91d7ad", "#e0bd84", "#8faadd"];
 export const stations = deskRows.flatMap((y, row) => deskColumns.map((x, column) => {
   const number = row * deskColumns.length + column + 1;
   return { number, id: "PC-" + String(number).padStart(2, "0"), x, y, screen: screens[(number - 1) % screens.length], hintSide: 1 };
 }));
 
-export const player = { x: 490, y: 471, facing: "north", moving: false, stride: 0, hp: 100, radius: 4 };
+export const player = { ...playerStart, facing: "north", moving: false, stride: 0, hp: 100, radius: 4 };
 export const noteSpots = [
-  { x: 454, y: 438 }, { x: 538, y: 458 }, { x: 459, y: 502 },
-  { x: 523, y: 520 }, { x: 490, y: 407 }, { x: 494, y: 540 },
+  { x: 573, y: 563 }, { x: 655, y: 581 }, { x: 566, y: 627 },
+  { x: 654, y: 649 }, { x: 610, y: 508 }, { x: 608, y: 707 },
 ].map(spot => ({ ...spot, kind: "note" }));
 
 function item(kind, x, y, box) {
@@ -26,41 +28,49 @@ function item(kind, x, y, box) {
 }
 
 const furniture = [
-  item("rack", 57, 111, [-13, -13, 13, 15]),
-  item("rack", 82, 111, [-13, -13, 13, 15]),
-  item("shelf", 211, 114, [-35, -7, 35, 18]),
-  item("partition", 186, 248, [-82, -4, 82, 8]),
-  item("partition", 808, 253, [-83, -4, 83, 8]),
-  item("shelf", 759, 116, [-35, -7, 35, 18]),
-  item("rack", 882, 122, [-13, -13, 13, 15]),
-  item("rack", 908, 122, [-13, -13, 13, 15]),
-  item("rack", 933, 122, [-13, -13, 13, 15]),
-  item("crate", 895, 180, [-10, -5, 12, 10]),
-  item("crate", 917, 180, [-10, -5, 12, 10]),
-  item("plant", 250, 143, [-7, -2, 7, 7]),
-  item("plant", 815, 150, [-7, -2, 7, 7]),
-  item("plant", 102, 251, [-7, -2, 7, 7]),
-  item("plant", 877, 254, [-7, -2, 7, 7]),
-  item("crate", 57, 324, [-10, -5, 12, 10]),
-  item("shelf", 100, 382, [-34, -7, 34, 18]),
-  item("crate", 196, 497, [-10, -5, 12, 10]),
-  item("crate", 219, 497, [-10, -5, 12, 10]),
-  item("shelf", 831, 480, [-34, -7, 34, 18]),
-  item("shelf", 920, 424, [-34, -7, 34, 18]),
-  item("plant", 343, 377, [-7, -2, 7, 7]),
-  item("plant", 631, 374, [-7, -2, 7, 7]),
-  item("sofa", 347, 446, [-36, -10, 36, 15]),
-  item("sofa", 638, 446, [-36, -10, 36, 15]),
-  item("table", 348, 500, [-27, -10, 27, 17]),
-  item("table", 637, 500, [-27, -10, 27, 17]),
-  item("plant", 276, 485, [-7, -2, 7, 7]),
-  item("plant", 705, 485, [-7, -2, 7, 7]),
-  item("plant", 406, 592, [-7, -2, 7, 7]),
-  item("plant", 574, 592, [-7, -2, 7, 7]),
-  item("sofa", 213, 607, [-36, -10, 36, 15]),
-  item("sofa", 767, 607, [-36, -10, 36, 15]),
-  item("crate", 40, 599, [-10, -5, 12, 10]),
-  item("crate", 935, 599, [-10, -5, 12, 10]),
+  // Archives and supply storage.
+  item("shelf", 91, 130, [-34, -7, 34, 18]),
+  item("shelf", 181, 130, [-34, -7, 34, 18]),
+  item("crate", 74, 174, [-10, -5, 12, 10]),
+  item("crate", 98, 174, [-10, -5, 12, 10]),
+  item("plant", 215, 177, [-7, -2, 7, 7]),
+  item("partition", 137, 209, [-76, -4, 76, 8]),
+  item("shelf", 112, 358, [-34, -7, 34, 18]),
+  item("shelf", 172, 400, [-34, -7, 34, 18]),
+  item("crate", 82, 401, [-10, -5, 12, 10]),
+  item("crate", 106, 401, [-10, -5, 12, 10]),
+  item("plant", 198, 352, [-7, -2, 7, 7]),
+
+  // Server racks and maintenance benches.
+  item("rack", 1029, 148, [-13, -13, 13, 15]),
+  item("rack", 1061, 148, [-13, -13, 13, 15]),
+  item("rack", 1093, 148, [-13, -13, 13, 15]),
+  item("rack", 1125, 148, [-13, -13, 13, 15]),
+  item("rack", 1111, 201, [-13, -13, 13, 15]),
+  item("rack", 1143, 201, [-13, -13, 13, 15]),
+  item("crate", 1012, 210, [-10, -5, 12, 10]),
+  item("table", 1038, 383, [-27, -10, 27, 17]),
+  item("table", 1126, 383, [-27, -10, 27, 17]),
+  item("shelf", 1115, 434, [-34, -7, 34, 18]),
+  item("plant", 1013, 439, [-7, -2, 7, 7]),
+
+  // Break area and entryway.
+  item("sofa", 362, 590, [-36, -10, 36, 15]),
+  item("sofa", 478, 590, [-36, -10, 36, 15]),
+  item("table", 421, 641, [-27, -10, 27, 17]),
+  item("plant", 323, 667, [-7, -2, 7, 7]),
+  item("plant", 518, 667, [-7, -2, 7, 7]),
+  item("sofa", 738, 590, [-36, -10, 36, 15]),
+  item("sofa", 853, 590, [-36, -10, 36, 15]),
+  item("table", 794, 641, [-27, -10, 27, 17]),
+  item("plant", 897, 667, [-7, -2, 7, 7]),
+  item("sofa", 139, 721, [-36, -10, 36, 15]),
+  item("plant", 88, 728, [-7, -2, 7, 7]),
+  item("shelf", 1072, 731, [-34, -7, 34, 18]),
+  item("crate", 1131, 732, [-10, -5, 12, 10]),
+  item("crate", 1154, 732, [-10, -5, 12, 10]),
+  item("plant", 553, 753, [-7, -2, 7, 7]),
+  item("plant", 667, 753, [-7, -2, 7, 7]),
 ];
 
 const obstacles = [
@@ -190,6 +200,8 @@ export function createRenderer(canvas) {
 }
 
 function drawOffice(ctx) {
+  const floorTop = 41;
+  const floorBottom = height - 26;
   box(ctx, "#101915", 0, 0, width, height);
   box(ctx, "#24372e", 10, 2, width - 20, 38);
   box(ctx, "#172820", 10, 4, width - 20, 2);
@@ -201,26 +213,24 @@ function drawOffice(ctx) {
   box(ctx, "#2b4034", 10, 28, width - 20, 10);
   box(ctx, "#15251d", 10, 38, width - 20, 3);
 
-  for (const x of [62, 220, 410, 504, 712, 864]) {
-    box(ctx, "#15241c", x - 2, 12, 72, 11);
-    box(ctx, "#315040", x, 14, 68, 6);
-    box(ctx, "#638c74", x + 3, 15, 62, 3);
-    box(ctx, "#addbb5", x + 5, 15, 58, 1);
+  for (const x of [107, 275, 443, centerX, 777, 945, 1113]) {
+    box(ctx, "#15241c", x - 36, 12, 72, 11);
+    box(ctx, "#315040", x - 34, 14, 68, 6);
+    box(ctx, "#638c74", x - 31, 15, 62, 3);
+    box(ctx, "#addbb5", x - 29, 15, 58, 1);
   }
-  box(ctx, "#89ab90", 449, 25, 82, 16);
-  box(ctx, "#354f40", 450, 26, 80, 14);
-  label(ctx, "LINUX LAB", 490, 29, "#c4e0bc");
+  box(ctx, "#89ab90", centerX - 41, 25, 82, 16);
+  box(ctx, "#354f40", centerX - 40, 26, 80, 14);
+  label(ctx, "LINUX LAB", centerX, 29, "#c4e0bc");
 
   const tileColors = ["#23362e", "#253930", "#263a31", "#24372f", "#273b32"];
-  box(ctx, "#1a2c25", 10, 41, width - 20, 603);
+  box(ctx, "#1a2c25", 10, floorTop, width - 20, floorBottom - floorTop);
   ctx.save();
   ctx.beginPath();
-  ctx.rect(10, 41, width - 20, 603);
+  ctx.rect(10, floorTop, width - 20, floorBottom - floorTop);
   ctx.clip();
-  for (let row = 0; row < 32; row++) {
-    for (let col = 0; col < 48; col++) {
-      const x = 10 + col * 20;
-      const y = 41 + row * 19;
+  for (let row = 0, y = floorTop; y < floorBottom; row++, y += 19) {
+    for (let col = 0, x = 10; x < width - 10; col++, x += 20) {
       const index = (row * row + col * 3 + row * col) % tileColors.length;
       box(ctx, tileColors[index], x + 1, y + 1, 19, 18);
       box(ctx, "#31473c", x + 2, y + 1, 17, 1);
@@ -229,32 +239,41 @@ function drawOffice(ctx) {
     }
   }
   ctx.restore();
-  box(ctx, "#12271c70", 10, 41, width - 20, 9);
-  box(ctx, "#12271c30", 10, 50, width - 20, 7);
+  box(ctx, "#12271c70", 10, floorTop, width - 20, 9);
+  box(ctx, "#12271c30", 10, floorTop + 9, width - 20, 7);
 
-  for (const [x, y, w, h, shade, trim] of [
-    [37, 78, 217, 93, "#47675935", "#5c7b6480"],
-    [780, 91, 166, 114, "#47667842", "#608a9d88"],
-    [58, 361, 121, 65, "#5c6d463f", "#81895680"],
-    [778, 405, 173, 116, "#66594245", "#927e5585"],
-    [300, 428, 382, 103, "#5c665125", "#7b85604d"],
-  ]) drawZone(ctx, x, y, w, h, shade, trim);
+  const serviceZones = [
+    [38, 80, 202, 153, "#5a6d4740", "#8394628c", "ARCHIVES"],
+    [54, 308, 172, 130, "#7160473e", "#a18a6088", "SUPPLIES"],
+    [989, 81, 187, 154, "#40657256", "#6c9ba78f", "NETWORK"],
+    [983, 327, 190, 137, "#655c7042", "#95849c87", "OPERATIONS"],
+  ];
+  for (const [x, y, w, h, shade, trim, title] of serviceZones) {
+    drawZone(ctx, x, y, w, h, shade, trim);
+    label(ctx, title, x + Math.floor(w / 2), y + 12, "#bed1b0bc");
+  }
+  for (const x of [300, 674]) {
+    drawZone(ctx, x, 558, 246, 126, "#75744c33", "#92996a75");
+  }
   for (const station of stations) drawStationZone(ctx, station);
 
-  for (const x of [455, 524]) {
-    for (let y = 411; y < 623; y += 12) box(ctx, "#78906d88", x, y, 2, 5);
+  const aisleStart = 78;
+  const aisleEnd = door.y - 42;
+  box(ctx, "#8da98a12", centerX - 25, aisleStart, 50, aisleEnd - aisleStart);
+  for (const x of [centerX - 27, centerX + 26]) {
+    for (let y = aisleStart; y < aisleEnd; y += 15) box(ctx, "#78906d88", x, y, 2, 6);
   }
-  for (const y of deskRows) {
-    for (let x = 264; x < 749; x += 14) box(ctx, "#6f866b65", x, y + 71, 5, 1);
+  for (const y of deskRows.slice(0, -1)) {
+    for (let x = 282; x < 939; x += 16) {
+      if (Math.abs(x - centerX) > 36) box(ctx, "#6f866b75", x, y + 89, 6, 1);
+    }
   }
-  for (const [x, y, text] of [
-    [143, 178, "ARCHIVES"], [858, 213, "NETWORK"],
-    [119, 433, "SUPPLIES"], [860, 530, "OPERATIONS"], [490, 416, "BREAK AREA"], [490, 609, "EXIT"],
-  ]) label(ctx, text, x, y, "#bed1b0bc");
+  label(ctx, "BREAK AREA", centerX, 533, "#bed1b0bc");
+  label(ctx, "EXIT", door.x, door.y - 21, "#bed1b0bc");
 
   for (const [x, y, shade] of [
-    [152, 118, "#89d0a532"], [815, 141, "#87bdcf35"], [490, 453, "#d7d5a740"],
-    [490, 635, "#bdcda22b"],
+    [136, 148, "#adbd8332"], [1080, 155, "#87bdcf35"],
+    [421, 626, "#d7d5a732"], [794, 626, "#d7d5a732"], [door.x, door.y, "#bdcda22b"],
   ]) {
     const glow = ctx.createRadialGradient(x, y, 1, x, y, 104);
     glow.addColorStop(0, shade);
@@ -262,28 +281,28 @@ function drawOffice(ctx) {
     box(ctx, glow, x - 104, y - 104, 208, 208);
   }
 
-  box(ctx, "#15271e", 2, 28, 8, 622);
-  box(ctx, "#415b49", 7, 28, 3, 616);
-  box(ctx, "#15271e", width - 10, 28, 8, 622);
-  box(ctx, "#415b49", width - 10, 28, 3, 616);
+  box(ctx, "#15271e", 2, 28, 8, height - 48);
+  box(ctx, "#415b49", 7, 28, 3, floorBottom - 28);
+  box(ctx, "#15271e", width - 10, 28, 8, height - 48);
+  box(ctx, "#415b49", width - 10, 28, 3, floorBottom - 28);
   for (const x of [9, width - 12]) {
-    for (let y = 78; y < 638; y += 72) {
+    for (let y = 78; y < floor.bottom; y += 72) {
       box(ctx, "#13231c", x - 1, y, 5, 13);
       box(ctx, "#547360", x, y + 3, 3, 6);
       box(ctx, "#91bd9d", x + 1, y + 4, 1, 3);
     }
   }
-  box(ctx, "#13241c", 10, 649, width - 20, 21);
-  box(ctx, "#3a5144", 10, 643, width - 20, 5);
-  box(ctx, "#506a58", door.x - 33, 642, 66, 9);
-  box(ctx, "#263c30", door.x - 30, 644, 60, 26);
-  box(ctx, "#17271f", door.x - 26, 647, 52, 23);
-  box(ctx, "#759282", door.x - 30, 644, 60, 1);
-  for (let x = door.x - 23; x <= door.x + 23; x += 7) box(ctx, "#a69b68", x, 648, 3, 2);
-  for (const x of [70, 293, 666, 898]) {
-    box(ctx, "#101e16", x, 653, 30, 10);
-    box(ctx, "#2e4839", x + 2, 655, 26, 6);
-    for (let slat = 0; slat < 8; slat++) box(ctx, "#121e17", x + 4 + slat * 3, 656, 1, 3);
+  box(ctx, "#13241c", 10, floorBottom + 5, width - 20, 21);
+  box(ctx, "#3a5144", 10, floorBottom - 1, width - 20, 5);
+  box(ctx, "#506a58", door.x - 33, floorBottom - 2, 66, 9);
+  box(ctx, "#263c30", door.x - 30, floorBottom, 60, 26);
+  box(ctx, "#17271f", door.x - 26, floorBottom + 3, 52, 23);
+  box(ctx, "#759282", door.x - 30, floorBottom, 60, 1);
+  for (let x = door.x - 23; x <= door.x + 23; x += 7) box(ctx, "#a69b68", x, floorBottom + 4, 3, 2);
+  for (const x of [69, 287, 415, 774, 902, 1120]) {
+    box(ctx, "#101e16", x, floorBottom + 9, 30, 10);
+    box(ctx, "#2e4839", x + 2, floorBottom + 11, 26, 6);
+    for (let slat = 0; slat < 8; slat++) box(ctx, "#121e17", x + 4 + slat * 3, floorBottom + 12, 1, 3);
   }
 }
 

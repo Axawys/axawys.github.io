@@ -1,4 +1,4 @@
-import { door, height, isWalkable, moveBody, player, width } from "./room.js";
+import { door, height, isWalkable, moveBody, player, playerStart, width } from "./room.js";
 import { makeField, nearestCell, pursue } from "./navigation.js";
 import { tasks } from "./tasks.js";
 import { createWeapons } from "./weapons.js";
@@ -110,7 +110,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
         if (distance > 140) break;
       }
     }
-    Object.assign(player, point ?? { x: 490, y: 471 }, { hp: 100, moving: false, facing: "north" });
+    Object.assign(player, point ?? playerStart, { hp: 100, moving: false, facing: "north" });
     arsenal.refill();
     state.dead = false;
     state.invulnerable = 1.25;
