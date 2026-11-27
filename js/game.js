@@ -16,12 +16,13 @@ const controlsDialog = byId("controls");
 const noteDialog = byId("note");
 const noteList = byId("tasks");
 const hintPanel = byId("station-hint");
+const hintCommands = byId("hint-command");
+const hintCopyStatus = byId("hint-copy-status");
 const health = byId("health");
 const armor = byId("armor");
 const death = byId("death");
 const weaponSlots = byId("weapon-slots");
-const allyTimer = byId("ally-timer");
-const allyTime = byId("ally-time");
+const allyTimers = byId("ally-timers");
 const eventNotices = byId("event-notices");
 const activeNotices = [];
 const note = noteSpots[Math.floor(Math.random() * noteSpots.length)];
@@ -122,6 +123,40 @@ function commandSequence(task) {
   return instruction;
 }
 
+function hintCommand(text) {
+  const row = document.createElement("div");
+  const command = document.createElement("code");
+  const copy = document.createElement("button");
+  row.className = "hint-command";
+  command.textContent = text;
+  copy.type = "button";
+  copy.className = "copy-command";
+  copy.textContent = "Скопировать";
+  copy.setAttribute("aria-label", "Скопировать команду " + text);
+  copy.addEventListener("click", async () => {
+    let copied;
+    try {
+      await navigator.clipboard.writeText(text);
+      copied = true;
+    } catch {
+      const selection = window.getSelection();
+      if (selection) {
+        const range = document.createRange();
+        range.selectNodeContents(command);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        copied = document.execCommand("copy");
+        if (copied) selection.removeAllRanges();
+      }
+    }
+    if (!copy.isConnected) return;
+    copy.textContent = copied ? "Скопировано" : "Выделено";
+    hintCopyStatus.textContent = copied ? "Скопировано: " + text : "Команда выделена для ручного копирования.";
+  });
+  row.append(command, copy);
+  return row;
+}
+
 const taskRows = new Map(tasks.map(task => {
   const row = document.createElement("li");
   const title = document.createElement("strong");
@@ -165,7 +200,9 @@ function openNote(target) {
   byId("note-title").textContent = hint ? "Подсказка для " + target.station.id : "Список дел";
   if (hint) {
     byId("hint-task").textContent = hint.title;
-    byId("hint-command").replaceChildren(commandSequence(hint));
+    hintCopyStatus.textContent = "";
+    const commands = [hint.setup, hint.command, hint.alternative?.command].filter(Boolean);
+    hintCommands.replaceChildren(...commands.map(hintCommand));
   }
   noteDialog.showModal();
 }
@@ -346,12 +383,29 @@ function updateAim() {
   return false;
 }
 
-function updateAllyTimer() {
-  const remaining = Math.ceil(action.state.ally?.remaining ?? 0);
-  allyTimer.hidden = remaining <= 0;
-  if (allyTimer.hidden) return;
-  const label = Math.floor(remaining / 60) + ":" + String(remaining % 60).padStart(2, "0");
-  if (allyTime.textContent !== label) allyTime.textContent = label;
+let shownAllies = [];
+function updateAllyTimers() {
+  const active = action.state.allies.filter(ally => ally.remaining > 0);
+  if (active.length !== shownAllies.length || active.some((ally, index) => ally !== shownAllies[index])) {
+    shownAllies = active;
+    allyTimers.hidden = !active.length;
+    byId("game").style.setProperty("--ally-timer-height", active.length * 40 + "px");
+    allyTimers.replaceChildren(...active.map(ally => {
+      const timer = document.createElement("div");
+      const name = document.createElement("span");
+      timer.className = "ally-timer";
+      timer.setAttribute("role", "timer");
+      name.textContent = ally.name;
+      timer.append(name, document.createElement("span"));
+      return timer;
+    }));
+  }
+  for (const [index, ally] of active.entries()) {
+    const remaining = Math.ceil(ally.remaining);
+    const label = Math.floor(remaining / 60) + ":" + String(remaining % 60).padStart(2, "0");
+    const time = allyTimers.children[index].lastElementChild;
+    if (time.textContent !== label) time.textContent = label;
+  }
 }
 
 function frame(time) {
@@ -387,7 +441,7 @@ function frame(time) {
     else if (!paused && achievementTasks.every(task => achievements.has(task.event))) action.startCelebration();
   }
   updateWeaponSlots();
-  updateAllyTimer();
+  updateAllyTimers();
   renderer.draw({ nearby, visited: terminal.visited, notes, action: action.state, time: action.state.time });
   requestAnimationFrame(frame);
 }

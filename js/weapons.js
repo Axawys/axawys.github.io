@@ -191,8 +191,11 @@ export function createWeapons(state, player, burst, shock, damageAlly = () => {}
       const damage = bfg ? weapon.damage : Math.round(weapon.damage * (1 - distance / weapon.radius * 0.48));
       damageRobot(robot, damage, robot.x, robot.y - robot.eye, { finish: bfg });
     }
-    const { ally } = state;
-    if (bfg && ally && Math.hypot(ally.x - x, ally.y - y) <= weapon.radius) damageAlly(ally, weapon.damage);
+    if (bfg) {
+      for (const ally of [...(state.allies ?? [])]) {
+        if (Math.hypot(ally.x - x, ally.y - y) <= weapon.radius) damageAlly(ally, weapon.damage);
+      }
+    }
   }
 
   function launchRocket(ray, weapon) {

@@ -265,9 +265,19 @@ function drawFurry(ctx, robot, time, friendly = false) {
 }
 
 export function drawAlly(ctx, ally, time) {
-  drawFurry(ctx, ally, time, true);
   const x = Math.round(ally.x);
-  const y = Math.round(ally.y) - 42;
+  const feet = Math.round(ally.y);
+  if (ally.kind === "furry") {
+    drawFurry(ctx, ally, time, true);
+  } else {
+    drawRobot(ctx, ally, time);
+    if (time < ally.attackUntil) {
+      for (const offset of [0, 4, 8]) {
+        line(ctx, "#a1f9bc", x + ally.attackSide * (12 + offset), feet - 9, x + ally.attackSide * (17 + offset), feet - 15);
+      }
+    }
+  }
+  const y = feet - robotTopOffset[ally.kind] - 6;
   box(ctx, "#17382a", x - 3, y - 2, 7, 7);
   box(ctx, "#a8f4c4", x, y - 1, 1, 5);
   box(ctx, "#a8f4c4", x - 2, y + 1, 5, 1);
@@ -398,8 +408,8 @@ function findTagPosition(occupied, view, anchorX, anchorY, feetY, half, height, 
   return findSpareTagPosition(occupied, view, center, above, half, height);
 }
 
-export function drawRobotTags(ctx, robots, livingPlayer, camera, weapon = null, ally = null) {
-  if (!robots.length && !ally) return;
+export function drawRobotTags(ctx, robots, livingPlayer, camera, weapon = null, allies = []) {
+  if (!robots.length && !allies.length) return;
   const left = Math.round(camera.x);
   const top = Math.round(camera.y);
   const view = { left: left + 3, right: left + camera.w - 3, top: top + 3, bottom: top + camera.h - 3 };
@@ -407,7 +417,7 @@ export function drawRobotTags(ctx, robots, livingPlayer, camera, weapon = null, 
   const visible = [];
   const tagHeight = 23;
   const occupied = livingPlayer ? [playerStatus(livingPlayer, weapon)] : [];
-  for (const robot of ally ? [ally, ...robots] : robots) {
+  for (const robot of allies.length ? [...allies, ...robots] : robots) {
     if (robot.x < left - 12 || robot.x > view.right + 15 || robot.y < top || robot.y > view.bottom + 33) continue;
     const anchorX = Math.round(robot.x);
     const feetY = Math.round(robot.y);
@@ -436,7 +446,7 @@ export function drawRobotTags(ctx, robots, livingPlayer, camera, weapon = null, 
   }
   for (const { x, y, half, height, hp, robot } of tags) {
     const barLeft = x - 17;
-    const friendly = robot === ally;
+    const friendly = allies.includes(robot);
     const fill = robot.hp > 0 ? Math.max(1, Math.floor(34 * robot.hp / robot.maxHp)) : 0;
     box(ctx, "#17251ff0", x - half, y, 2 * half, height);
     label(ctx, robot.name, x, y + 2, robot.color);

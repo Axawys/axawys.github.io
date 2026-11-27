@@ -89,7 +89,7 @@ export function createTerminal(stations, systems, onMaintenance) {
     } else if (task.setup && !active.root) {
       print("E: Недостаточно прав. Сначала выполните su -.");
     } else if (option.once && usedCommands.has(command)) {
-      print("Фурри-союзника можно вызвать только один раз за игру.");
+      print("Этого союзника можно вызвать только один раз за игру.");
     } else if (active.completed) {
       print("Ничего не изменилось. Задание уже выполнено.");
     } else {

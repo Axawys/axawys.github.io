@@ -23,7 +23,7 @@
     <p id="death" role="status" hidden>Вы погибли</p>
     <div id="weapon-slots" class="weapon-slots" role="group" aria-label="Выбор оружия" hidden></div>
     <div id="event-notices" class="event-notices" role="log" aria-label="События в офисе"></div>
-    <div id="ally-timer" class="ally-timer" role="timer" hidden><span>Фурри-союзник</span><span id="ally-time">1:00</span></div>
+    <div id="ally-timers" class="ally-timers" hidden></div>
     <div id="achievement-notice" class="achievement-notice" role="status"></div>
     <output id="health" class="visually-hidden" aria-label="Здоровье">100</output>
     <output id="armor" class="visually-hidden" aria-label="Броня">0</output>
@@ -91,7 +91,11 @@
       <button type="button" id="close-note" aria-label="Закрыть записку" aria-keyshortcuts="E Escape" autofocus>×</button>
     </header>
     <ul id="tasks"></ul>
-    <p class="note-hint" id="station-hint" hidden><strong id="hint-task"></strong><span id="hint-command"></span></p>
+    <div class="note-hint" id="station-hint" hidden>
+      <strong id="hint-task"></strong>
+      <div id="hint-command" class="hint-commands"></div>
+      <p id="hint-copy-status" class="visually-hidden" role="status"></p>
+    </div>
     <p class="note-controls guide-keyboard">E — закрыть записку</p>
   </dialog>
 

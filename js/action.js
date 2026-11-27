@@ -16,8 +16,11 @@ const gentooRadius = 106;
 const gentooMobDamage = 500;
 const allyDuration = 60;
 const allySpeed = 138;
-const allyMaxHp = 500;
 const allyColor = "#91e6b2";
+const allyTypes = {
+  ally: { kind: "furry", name: "Фурри-союзник", maxHp: 500, side: 1 },
+  gigacode: { kind: "agent", name: "gigacode", maxHp: robotTypes.agent.maxHp / 2, side: -1 },
+};
 const celebrationDuration = 10;
 const fireworkColors = ["#ffb578", "#92c9ff", "#f7dc8e", "#e9a1df", "#9af0bd"];
 
@@ -55,7 +58,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
   let weaponsUnlocked = false;
   const state = {
     time: 0, aim: { x: player.x, y: player.y - 48, visible: false },
-    robots: [], particles: [], shocks: [], shots: [], projectiles: [], pending: [], visitor: null, ally: null,
+    robots: [], particles: [], shocks: [], shots: [], projectiles: [], pending: [], visitor: null, allies: [],
     supplies: supplySpots.map(spot => {
       if (!spot.weaponId) return { ...spot };
       const index = weapons.findIndex(weapon => weapon.id === spot.weaponId);
@@ -155,16 +158,17 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
   }
 
   function trigger(event, station, view) {
-    if (event === "ally") {
-      if (state.ally) return;
-      const point = nearFree(station.x + 25, station.y + 45, 6) ?? nearFree(player.x, player.y, 6);
+    const allyType = allyTypes[event];
+    if (allyType) {
+      if (state.allies.some(ally => ally.kind === allyType.kind)) return;
+      const point = nearFree(station.x + allyType.side * 25, station.y + 45, 6) ?? nearFree(player.x, player.y, 6);
       if (!point) return;
-      state.ally = {
-        ...point, kind: "furry", name: "Фурри-союзник", color: allyColor, radius: 6,
-        hp: allyMaxHp, maxHp: allyMaxHp, stride: 0, phase: "guard", remaining: allyDuration, nextAttack: state.time,
-      };
+      state.allies.push({
+        ...point, ...allyType, color: allyColor, radius: 6, hp: allyType.maxHp,
+        stride: 0, phase: "guard", remaining: allyDuration, nextAttack: state.time,
+      });
       burst(point.x, point.y - 12, [allyColor, "#e0f8d8"], 16, 66);
-      onNotice("Фурри-союзник пришёл на помощь");
+      onNotice(allyType.name + " пришёл на помощь");
       return;
     }
     if (event === "visitor" || event === "elder") {
@@ -199,8 +203,9 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
           arsenal.damageRobot(robot, gentooMobDamage, robot.x, robot.y - robot.eye);
         }
       }
-      const { ally } = state;
-      if (ally && Math.hypot(ally.x - blast.x, ally.y - blast.y) <= blast.radius) damageAlly(ally, gentooMobDamage);
+      for (const ally of [...state.allies]) {
+        if (Math.hypot(ally.x - blast.x, ally.y - blast.y) <= blast.radius) damageAlly(ally, gentooMobDamage);
+      }
       const shake = Math.min(1, Math.max(0, 1 - (distance - blast.radius) / 130));
       state.shake = Math.max(state.shake, shake);
       return;
@@ -291,17 +296,15 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     return nearest;
   }
 
-  function advanceAlly(elapsed, sceneElapsed) {
-    const ally = state.ally;
-    if (!ally) return;
+  function advanceAlly(ally, elapsed, sceneElapsed) {
     if (ally.phase !== "guard") {
-      if (walkOut(ally, elapsed, 110)) state.ally = null;
+      if (walkOut(ally, elapsed, 110)) removeAlly(ally);
       return;
     }
     ally.remaining = Math.max(0, ally.remaining - sceneElapsed);
     if (ally.remaining === 0) {
       ally.phase = "door";
-      onNotice("Фурри-союзник уходит");
+      onNotice(ally.name + " уходит");
       return;
     }
 
@@ -316,7 +319,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
       return;
     }
 
-    const target = threat ?? nearFree(player.x + 22, player.y + 14, ally.radius);
+    const target = threat ?? nearFree(player.x + ally.side * 22, player.y + 14, ally.radius);
     if (!target) return;
     const cell = nearestCell(target.x, target.y);
     if (ally.targetCell !== cell) {
@@ -354,8 +357,25 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     }
 
     burst(ally.x, ally.y - 15, [allyColor, "#d9e7d3", "#627dab"], 22, 90);
-    state.ally = null;
-    onNotice("Фурри-союзник погиб", true);
+    removeAlly(ally);
+    onNotice(ally.name + " погиб", true);
+  }
+
+  function removeAlly(ally) {
+    state.allies.splice(state.allies.indexOf(ally), 1);
+  }
+
+  function interceptingAlly(robot, playerGap) {
+    let closest;
+    let gap = 52;
+    for (const ally of state.allies) {
+      if (ally.phase !== "guard") continue;
+      const distance = Math.hypot(ally.x - robot.x, ally.y - robot.y);
+      if (distance >= gap || distance >= Math.max(34, playerGap + 6) || !clearPath(robot, ally)) continue;
+      closest = ally;
+      gap = distance;
+    }
+    return closest ? { ally: closest, gap } : null;
   }
 
   function advanceRobots(elapsed) {
@@ -363,22 +383,17 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     for (const robot of state.robots) {
       if (robot.reviveAt || state.time < robot.ready) continue;
       const gap = Math.hypot(player.x - robot.x, player.y - robot.y);
-      const ally = state.ally?.phase === "guard" ? state.ally : null;
-      if (ally) {
-        const dx = ally.x - robot.x;
-        const dy = ally.y - robot.y;
-        const allyGap = Math.hypot(dx, dy);
-        const intercepted = allyGap < 34 || (allyGap < 52 && allyGap < gap + 6);
-        if (intercepted && clearPath(robot, ally)) {
-          const reach = robot.radius + ally.radius + 1;
-          if (allyGap <= reach + 0.1) {
-            attackAlly(robot, ally);
-          } else {
-            const travel = Math.min(robot.speed * elapsed, allyGap - reach);
-            if (moveBody(robot, dx * travel / allyGap, dy * travel / allyGap)) robot.stride += elapsed * 13;
-          }
-          continue;
+      const interception = interceptingAlly(robot, gap);
+      if (interception) {
+        const { ally, gap: allyGap } = interception;
+        const reach = robot.radius + ally.radius + 1;
+        if (allyGap <= reach + 0.1) {
+          attackAlly(robot, ally);
+        } else {
+          const travel = Math.min(robot.speed * elapsed, allyGap - reach) / allyGap;
+          if (moveBody(robot, (ally.x - robot.x) * travel, (ally.y - robot.y) * travel)) robot.stride += elapsed * 13;
         }
+        continue;
       }
       if (gap < robot.radius + player.radius + 1) {
         if (robot.kind === "furry" && !state.invulnerable) {
@@ -503,7 +518,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     state.shots = state.shots.filter(shot => shot.life > 0);
     reviveRobots();
     advanceVisitor(elapsed);
-    advanceAlly(elapsed, sceneElapsed);
+    for (const ally of [...state.allies]) advanceAlly(ally, elapsed, sceneElapsed);
     arsenal.update(elapsed, holding, pressed);
     advanceCelebration(sceneElapsed);
 

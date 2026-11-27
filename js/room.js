@@ -226,8 +226,7 @@ export function createRenderer(canvas) {
       context.globalAlpha = 1;
       drawBurningRobot(context, robot, time);
     } });
-    const ally = action.ally;
-    if (ally) layers.push({ depth: ally.y, draw: () => drawAlly(context, ally, time) });
+    for (const ally of action.allies) layers.push({ depth: ally.y, draw: () => drawAlly(context, ally, time) });
     if (action.visitor) layers.push({ depth: action.visitor.y, draw: () => drawVisitor(context, action.visitor, time, player) });
     layers.push({ depth: player.y, draw: () => {
       drawPlayer(context, player, action, time);
@@ -236,7 +235,7 @@ export function createRenderer(canvas) {
     for (const layer of layers.sort((a, b) => a.depth - b.depth)) layer.draw(context, time * 1000);
     if (weapon) drawWeapon(context, player, action.aim, weapon, true);
     drawEffects(context, action, time);
-    drawRobotTags(context, action.robots, action.dead ? null : player, camera, weapon, ally);
+    drawRobotTags(context, action.robots, action.dead ? null : player, camera, weapon, action.allies);
     context.restore();
   }
   return { camera, follow, worldPoint, screenPoint, draw };
