@@ -1,6 +1,5 @@
 import { door, height, isWalkable, moveBody, player, playerStart, width } from "./room.js";
 import { makeField, nearestCell, pursue } from "./navigation.js";
-import { tasks } from "./tasks.js";
 import { createWeapons } from "./weapons.js";
 
 const robotTypes = {
@@ -60,8 +59,6 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
   let playerCell = -1;
   let playerField;
   const queuedVisitors = [];
-  const encountered = new Set();
-  let celebrated = false;
   const doorField = makeField(nearestCell(door.x, door.y));
 
   function burst(x, y, colors, count, force, smoke = false) {
@@ -141,7 +138,6 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
   }
 
   function trigger(event, station, view) {
-    encountered.add(event);
     if (event === "visitor") {
       if (state.visitor) queuedVisitors.push(view);
       else callVisitor(view);
@@ -252,20 +248,17 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     }
   }
 
+  function startCelebration() {
+    state.celebration = { elapsed: 0, nextLaunch: 0, launches: [], count: 0 };
+  }
+
   function advanceCelebration(elapsed) {
-    if (celebrated) return;
-    if (!state.celebration) {
-      if (encountered.size !== tasks.length || state.dead || state.robots.length
-        || state.pending.length || state.visitor || queuedVisitors.length) return;
-      state.celebration = { elapsed: 0, nextLaunch: 0, launches: [], count: 0 };
-      elapsed = 0;
-    }
     const show = state.celebration;
+    if (!show) return;
     show.elapsed += elapsed;
     if (show.elapsed >= celebrationDuration) {
       state.celebration = null;
       state.medal = true;
-      celebrated = true;
       onCelebrated();
       return;
     }
@@ -323,5 +316,5 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     return false;
   }
 
-  return { state, trigger, update, cycleWeapon: arsenal.cycle, selectWeapon: arsenal.select };
+  return { state, trigger, startCelebration, update, cycleWeapon: arsenal.cycle, selectWeapon: arsenal.select };
 }

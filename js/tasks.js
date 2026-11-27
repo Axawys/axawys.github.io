@@ -7,4 +7,4 @@ export const tasks = [
   { system: "NixOS", title: "Удалить хранилище NixOS", command: "sudo rm -rf /nix/store", event: "furry", achievement: "Пушистая ярость" },
 ];
 
-export const finaleAchievement = { system: "Linux Lab", event: "linux-user", achievement: "Теперь ты настоящий линуксоид" };
+export const finaleAchievement = { system: "Linux Lab", event: "linux-user", achievement: "Настоящий линуксоид" };

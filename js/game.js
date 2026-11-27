@@ -333,7 +333,10 @@ function frame(time) {
   if (death.hidden === action.state.dead) death.hidden = !action.state.dead;
   while (activeNotices[0]?.expires <= action.state.time) activeNotices.shift().element.remove();
   canvas.classList.toggle("armed", action.state.armed);
-  if (!action.state.medal && achievements.has(finaleAchievement.event)) action.state.medal = true;
+  if (!action.state.medal && !action.state.celebration) {
+    if (achievements.has(finaleAchievement.event)) action.state.medal = true;
+    else if (!paused && tasks.every(task => achievements.has(task.event))) action.startCelebration();
+  }
   updateWeaponSlots();
   renderer.draw({ nearby, visited: terminal.visited, notes, action: action.state, time: action.state.time });
   requestAnimationFrame(frame);
