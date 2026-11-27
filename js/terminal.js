@@ -1,16 +1,15 @@
-import { createFastfetch, shuffleSystems } from "./systems.js";
+import { createFastfetch } from "./systems.js";
 import { tasks } from "./tasks.js";
 
 const byId = id => document.getElementById(id);
 
-export function createTerminal(stations, onMaintenance) {
+export function createTerminal(stations, systems, onMaintenance) {
   const dialog = byId("computer");
   const terminal = byId("terminal-screen");
   const output = byId("terminal-output");
   const form = byId("terminal-form");
   const input = byId("command");
   const promptLabel = byId("prompt");
-  const systems = shuffleSystems();
   const visited = new Set();
   let active;
 

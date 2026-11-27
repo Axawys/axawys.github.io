@@ -7,11 +7,11 @@ export const door = { x: 490, y: 629 };
 const floor = { left: 15, right: width - 15, top: 49, bottom: 638 };
 
 export const stations = [
-  { number: 1, x: 153, y: 117, screen: "#80dbc1" },
-  { number: 2, x: 459, y: 112, screen: "#b4a6e2" },
-  { number: 3, x: 804, y: 133, screen: "#83bedc" },
-  { number: 4, x: 152, y: 418, screen: "#91d7ad" },
-  { number: 5, x: 813, y: 410, screen: "#e0bd84" },
+  { number: 1, x: 153, y: 117, screen: "#80dbc1", hintSide: 1 },
+  { number: 2, x: 459, y: 112, screen: "#b4a6e2", hintSide: 1 },
+  { number: 3, x: 804, y: 133, screen: "#83bedc", hintSide: -1 },
+  { number: 4, x: 152, y: 418, screen: "#91d7ad", hintSide: 1 },
+  { number: 5, x: 813, y: 410, screen: "#e0bd84", hintSide: -1 },
 ];
 
 export const player = { x: 490, y: 471, facing: "north", moving: false, stride: 0, hp: 100, radius: 4 };
@@ -99,9 +99,9 @@ export function movePlayer(dx, dy, elapsed) {
   if (player.moving) player.stride += elapsed;
 }
 
-export function nearestInteraction(note) {
-  if (Math.hypot(player.x - note.x, player.y - note.y) < 23) return note;
-  return stations.find(station => !station.offline && !station.busy && Math.abs(player.x - station.x) <= 29
+export function nearestInteraction(notes) {
+  return notes.find(note => Math.hypot(player.x - note.x, player.y - note.y) < 23)
+    ?? stations.find(station => !station.offline && !station.busy && Math.abs(player.x - station.x) <= 29
     && player.y >= station.y + 20 && player.y <= station.y + 53);
 }
 
@@ -147,7 +147,7 @@ export function createRenderer(canvas) {
   }
 
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
-  function draw({ nearby, visited, note, action, time }) {
+  function draw({ nearby, visited, notes, action, time }) {
     const shake = reduceMotion.matches ? 0 : action.shake * 7;
     const offsetX = Math.round(Math.sin(time * 74) * shake);
     const offsetY = Math.round(Math.cos(time * 59) * shake);
@@ -162,7 +162,7 @@ export function createRenderer(canvas) {
         draw: () => drawDesk(context, station, station === nearby, visited.has(station.number), time * 1000),
       });
     }
-    layers.push({ depth: note.y, draw: () => drawNote(context, note, nearby === note, time) });
+    for (const note of notes) layers.push({ depth: note.y, draw: () => drawNote(context, note, nearby === note, time) });
     for (const robot of action.robots) layers.push({ depth: robot.y, draw: () => drawRobot(context, robot, time) });
     if (action.visitor) layers.push({ depth: action.visitor.y, draw: () => drawVisitor(context, action.visitor, time, player) });
     layers.push({ depth: player.y, draw: () => {
@@ -421,9 +421,10 @@ function drawFurniture(ctx, { x, y, kind, box: bounds }, time) {
 function drawNote(ctx, note, nearby, time) {
   const x = note.x;
   const y = note.y;
+  const hint = Boolean(note.station);
   box(ctx, "#151f18", x - 6, y - 4, 13, 9);
-  box(ctx, nearby ? "#fff0bb" : "#e7ce91", x - 6, y - 6, 12, 9);
-  box(ctx, "#f3e1ab", x - 6, y - 6, 10, 1);
-  for (let row = -4; row <= 0; row += 2) box(ctx, "#8b7144", x - 4, y + row, 6, 1);
-  if (Math.sin(time * 2.5) > 0.45) pixels(ctx, "#ffe4a2", x + 9, y - 8, 2);
+  box(ctx, hint ? (nearby ? "#d1f4e3" : "#9ccab9") : (nearby ? "#fff0bb" : "#e7ce91"), x - 6, y - 6, 12, 9);
+  box(ctx, hint ? "#c2e3d2" : "#f3e1ab", x - 6, y - 6, 10, 1);
+  for (let row = -4; row <= 0; row += 2) box(ctx, hint ? "#496f62" : "#8b7144", x - 4, y + row, 6, 1);
+  if (Math.sin(time * 2.5) > 0.45) pixels(ctx, hint ? "#bdebd4" : "#ffe4a2", x + 9, y - 8, 2);
 }

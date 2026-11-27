@@ -1,5 +1,6 @@
 import { createAction } from "./action.js";
 import { createRenderer, movePlayer, nearestInteraction, noteSpots, player, stations } from "./room.js";
+import { shuffleSystems } from "./systems.js";
 import { tasks } from "./tasks.js";
 import { createTerminal } from "./terminal.js";
 
@@ -9,22 +10,28 @@ const interactButton = byId("interact");
 const interactText = interactButton.querySelector("span");
 const noteDialog = byId("note");
 const noteList = byId("tasks");
+const hintPanel = byId("station-hint");
 const health = byId("health");
 const death = byId("death");
 const note = noteSpots[Math.floor(Math.random() * noteSpots.length)];
+const systems = shuffleSystems();
+const notes = [note, ...stations.map((station, index) => ({
+  kind: "note",
+  x: station.x + station.hintSide * 58,
+  y: station.y + 44,
+  station,
+  task: tasks.find(task => task.system === systems[index].name),
+}))];
 
 const renderer = createRenderer(canvas);
 const action = createAction();
-const terminal = createTerminal(stations, (task, station) => {
+const terminal = createTerminal(stations, systems, (task, station) => {
   taskRows.get(task).classList.add("done");
   action.trigger(task.event, station, renderer.camera);
 });
 
-const taskRows = new Map(tasks.map(task => {
-  const row = document.createElement("li");
-  const title = document.createElement("strong");
-  title.textContent = task.title;
-  const instruction = document.createElement("span");
+function commandSequence(task) {
+  const instruction = document.createDocumentFragment();
   if (task.setup) {
     const setup = document.createElement("code");
     setup.textContent = task.setup;
@@ -33,6 +40,15 @@ const taskRows = new Map(tasks.map(task => {
   const command = document.createElement("code");
   command.textContent = task.command;
   instruction.append(command);
+  return instruction;
+}
+
+const taskRows = new Map(tasks.map(task => {
+  const row = document.createElement("li");
+  const title = document.createElement("strong");
+  title.textContent = task.title;
+  const instruction = document.createElement("span");
+  instruction.append(commandSequence(task));
   row.append(title, instruction);
   noteList.append(row);
   return [task, row];
@@ -46,15 +62,30 @@ let previousTime;
 let pointer;
 let shootingPointer;
 let shotRequest;
+let interactionKeyHeld = false;
 
 function interact() {
-  if (action.state.dead || terminal.isOpen || noteDialog.open) return;
-  const target = nearestInteraction(note);
-  if (!target) return;
+  if (action.state.dead || terminal.isOpen || noteDialog.open) return false;
+  const target = nearestInteraction(notes);
+  if (!target) return false;
 
   resetInput();
-  if (target === note) noteDialog.showModal();
+  if (target.kind === "note") openNote(target);
   else terminal.open(target);
+  return true;
+}
+
+function openNote(target) {
+  const hint = target.task;
+  noteList.hidden = Boolean(hint);
+  byId("note-controls").hidden = Boolean(hint);
+  hintPanel.hidden = !hint;
+  byId("note-title").textContent = hint ? "Подсказка для PC-0" + target.station.number : "Список дел";
+  if (hint) {
+    byId("hint-task").textContent = hint.title;
+    byId("hint-command").replaceChildren(commandSequence(hint));
+  }
+  noteDialog.showModal();
 }
 
 function closeNote() {
@@ -67,18 +98,19 @@ function resetInput() {
   directions.clear();
   shootingPointer = undefined;
   shotRequest = undefined;
+  interactionKeyHeld = false;
 }
 
 function updateInteraction(paused) {
-  const target = paused || action.state.dead ? undefined : nearestInteraction(note);
+  const target = paused || action.state.dead ? undefined : nearestInteraction(notes);
   if (target !== nearby) {
     nearby = target;
     interactButton.hidden = !target;
-    interactText.textContent = target === note ? "Читать записку" : "Сесть за ПК";
+    interactText.textContent = target?.task ? "Читать подсказку" : target === note ? "Читать записку" : "Сесть за ПК";
   }
   if (!target) return;
 
-  const point = renderer.screenPoint(target.x, target.y - (target === note ? 37 : 20));
+  const point = renderer.screenPoint(target.x, target.y - (target.kind === "note" ? 37 : 20));
   const half = interactButton.offsetWidth / 2 + 5;
   interactButton.style.left = Math.max(half, Math.min(canvas.clientWidth - half, point.x)) + "px";
   interactButton.style.top = Math.max(interactButton.offsetHeight + 5, point.y) + "px";
@@ -92,6 +124,10 @@ noteDialog.addEventListener("cancel", event => {
 });
 
 window.addEventListener("keydown", event => {
+  if (event.code === "KeyE" && event.repeat && interactionKeyHeld) {
+    event.preventDefault();
+    return;
+  }
   if (terminal.isOpen) {
     terminal.handleKey(event);
     return;
@@ -101,11 +137,15 @@ window.addEventListener("keydown", event => {
     event.preventDefault();
     keys.add(event.code);
   } else if (event.code === "KeyE" && !event.repeat) {
-    interact();
+    event.preventDefault();
+    interactionKeyHeld = interact();
   }
 });
 
-window.addEventListener("keyup", event => keys.delete(event.code));
+window.addEventListener("keyup", event => {
+  keys.delete(event.code);
+  if (event.code === "KeyE") interactionKeyHeld = false;
+});
 window.addEventListener("blur", resetInput);
 document.addEventListener("visibilitychange", resetInput);
 
@@ -178,7 +218,7 @@ function frame(time) {
   if (health.value !== String(player.hp)) health.value = String(player.hp);
   if (death.hidden === action.state.dead) death.hidden = !action.state.dead;
   canvas.classList.toggle("armed", action.state.armed && !action.state.dead);
-  renderer.draw({ nearby, visited: terminal.visited, note, action: action.state, time: action.state.time });
+  renderer.draw({ nearby, visited: terminal.visited, notes, action: action.state, time: action.state.time });
   requestAnimationFrame(frame);
 }
 
