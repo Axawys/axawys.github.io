@@ -7,6 +7,7 @@ export const weapons = [
   { id: "grenade", kind: "grenade", name: "Гранаты", capacity: 6, length: 7, color: "#aaca88", range: 155, radius: 55, damage: 128, cooldown: 0.78 },
   { id: "flame", kind: "flame", name: "Огнемёт", capacity: 40, length: 15, thickness: 4, color: "#f9b06e", range: 96, damage: 12, cooldown: 0.09, automatic: true },
   { id: "rifle", kind: "bullet", name: "Автомат", capacity: 50, length: 13, thickness: 3, color: "#a8b7a5", range: 560, damage: 24, cooldown: 0.105, automatic: true },
+  { id: "bfg", kind: "rocket", name: "BFG", capacity: 1, refillable: false, length: 21, thickness: 6, color: "#9aee8f", range: 440, radius: 150, damage: 10000, cooldown: 0.9 },
 ];
 
 const burnDuration = 3;
@@ -81,7 +82,7 @@ function wallDistance(x, y, dx, dy, range) {
   return range;
 }
 
-export function createWeapons(state, player, burst, shock) {
+export function createWeapons(state, player, burst, shock, damageAlly = () => {}) {
   const owned = weapons.map(weapon => weapon.id === "pistol");
   const ammo = weapons.map((weapon, index) => owned[index] ? weapon.capacity : 0);
   let selected = 0;
@@ -89,7 +90,7 @@ export function createWeapons(state, player, burst, shock) {
 
   function refill() {
     for (const [index, weapon] of weapons.entries()) {
-      if (owned[index]) ammo[index] = weapon.capacity;
+      if (owned[index] && weapon.refillable !== false) ammo[index] = weapon.capacity;
     }
     cooldown = 0;
   }
@@ -118,20 +119,29 @@ export function createWeapons(state, player, burst, shock) {
     select(next);
   }
 
-  function damageRobot(robot, damage, x, y, colors = [robot.color, "#ffe6b1"]) {
+  function damageRobot(robot, damage, x, y, { colors = [robot.color, "#ffe6b1"], finish = false } = {}) {
+    if (robot.reviveAt && !finish) return;
     robot.flash = state.time + 0.11;
-    robot.hp -= damage;
+    robot.hp = Math.max(0, robot.hp - damage);
     burst(x, y, colors, 8, 83);
     if (robot.hp > 0) return;
+
+    if (robot.phase === 1 && !finish) {
+      robot.reviveAt = state.time + 1;
+      delete robot.burn;
+      burst(robot.x, robot.y - robot.eye, ["#ed9e6f", "#81928a"], 12, 50);
+      return;
+    }
 
     state.robots.splice(state.robots.indexOf(robot), 1);
     shock(robot.x, robot.y - 3, 22, robot.color, 0.22);
     burst(robot.x, robot.y - robot.eye, ["#d9c491", "#f5a46b", "#687e72"], 16, 95);
   }
 
-  function firstRobot(ray, range) {
+  function firstRobot(ray, range, includeDowned = false) {
     let result = null;
     for (const robot of state.robots) {
+      if (robot.reviveAt && !includeDowned) continue;
       const x = Math.round(robot.x) - ray.x;
       const y = Math.round(robot.y) - ray.y;
       for (const [left, top, right, bottom] of hitboxes[robot.kind]) {
@@ -161,28 +171,33 @@ export function createWeapons(state, player, burst, shock) {
   }
 
   function explode(x, y, weapon, directHit = null) {
-    shock(x, y, weapon.radius, "#ffbe74", 0.43);
-    burst(x, y - 4, ["#fff0bc", "#ffc47d", "#ef8450", "#ba593c"], 35, 142);
-    burst(x, y, ["#60544b", "#49443d"], 8, 48, true);
-    state.shake = Math.max(state.shake, 0.32);
+    const bfg = weapon.id === "bfg";
+    const colors = bfg ? ["#e9ffd0", "#bbf89c", "#74d983", "#3f9a66"] : ["#fff0bc", "#ffc47d", "#ef8450", "#ba593c"];
+    shock(x, y, weapon.radius, bfg ? "#9aee8f" : "#ffbe74", bfg ? 0.9 : 0.43);
+    if (bfg) shock(x, y, weapon.radius * 0.64, "#e3ffc0", 0.58);
+    burst(x, y - 4, colors, bfg ? 105 : 35, bfg ? 233 : 142);
+    burst(x, y, ["#60544b", "#49443d"], bfg ? 15 : 8, 48, true);
+    state.shake = Math.max(state.shake, bfg ? 0.75 : 0.32);
     for (const robot of [...state.robots]) {
       if (robot === directHit) {
-        damageRobot(robot, weapon.damage, x, y - 9);
+        damageRobot(robot, weapon.damage, x, y - 9, { finish: bfg });
         continue;
       }
       const dx = robot.x - x;
       const dy = robot.y - y;
       const distance = Math.hypot(dx, dy);
       if (distance > weapon.radius) continue;
-      if (distance > 1 && wallDistance(x, y, dx / distance, dy / distance, distance) < distance) continue;
-      const damage = Math.round(weapon.damage * (1 - distance / weapon.radius * 0.48));
-      damageRobot(robot, damage, robot.x, robot.y - robot.eye);
+      if (!bfg && distance > 1 && wallDistance(x, y, dx / distance, dy / distance, distance) < distance) continue;
+      const damage = bfg ? weapon.damage : Math.round(weapon.damage * (1 - distance / weapon.radius * 0.48));
+      damageRobot(robot, damage, robot.x, robot.y - robot.eye, { finish: bfg });
     }
+    const { ally } = state;
+    if (bfg && ally && Math.hypot(ally.x - x, ally.y - y) <= weapon.radius) damageAlly(ally, weapon.damage);
   }
 
   function launchRocket(ray, weapon) {
     const clear = wallDistance(ray.x, ray.y + 9, ray.dx, ray.dy, weapon.length);
-    const near = firstRobot(ray, clear);
+    const near = firstRobot(ray, clear, weapon.id === "bfg");
     if (near || clear < weapon.length) {
       const distance = near?.distance ?? clear;
       explode(ray.x + ray.dx * distance, ray.y + ray.dy * distance + 9, weapon, near?.robot);
@@ -231,6 +246,7 @@ export function createWeapons(state, player, burst, shock) {
       });
     }
     for (const robot of [...state.robots]) {
+      if (robot.reviveAt) continue;
       const vx = robot.x - x;
       const spriteX = Math.round(robot.x) - x;
       const spriteY = Math.round(robot.y) - y;
@@ -252,7 +268,7 @@ export function createWeapons(state, player, burst, shock) {
       if (!burn) continue;
       const end = Math.min(state.time, burn.until);
       while (burn.nextTick <= end + 1e-9 && robot.hp > 0) {
-        damageRobot(robot, burnDamage, robot.x, robot.y - robot.eye, ["#ffd68a", "#ee7541"]);
+        damageRobot(robot, burnDamage, robot.x, robot.y - robot.eye, { colors: ["#ffd68a", "#ee7541"] });
         burn.nextTick += burnInterval;
       }
       if (state.time >= burn.until) delete robot.burn;
@@ -275,7 +291,7 @@ export function createWeapons(state, player, burst, shock) {
     const { x, y, dx, dy } = projectile;
     const step = Math.min(projectile.remaining, elapsed * 305);
     const clear = wallDistance(x, y + 9, dx, dy, step);
-    const target = firstRobot(projectile, clear);
+    const target = firstRobot(projectile, clear, weapon.id === "bfg");
     const travel = target?.distance ?? clear;
     projectile.x += dx * travel;
     projectile.y += dy * travel;

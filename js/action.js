@@ -3,8 +3,8 @@ import { clearPath, makeField, nearestCell, pursue } from "./navigation.js";
 import { createWeapons, weapons } from "./weapons.js";
 
 const robotTypes = {
-  spider: { name: "Паук Ubuntu", radius: 5, eye: 8, maxHp: 1100, speed: 88, damage: 24, color: "#ff947a" },
-  walker: { name: "Робот ALT Linux", radius: 6, eye: 21, maxHp: 1920, speed: 70, damage: 38, color: "#f6c786" },
+  spider: { name: "Паук Ubuntu", radius: 5, eye: 8, maxHp: 1100, speed: 88, damage: 24, color: "#ff947a", phase: 1 },
+  walker: { name: "Робот ALT Linux", radius: 6, eye: 21, maxHp: 1920, speed: 70, damage: 38, color: "#f6c786", phase: 1 },
   swarm: { name: "ИИ-агент", radius: 3, eye: 4, maxHp: 440, speed: 87, damage: 12, color: "#e6ac76" },
   agent: { radius: 6, eye: 13, maxHp: 1440, speed: 74, damage: 25 },
   furry: { name: "Фурри", radius: 6, eye: 17, maxHp: 500, speed: 98, damage: 28, color: "#a8c8ff" },
@@ -57,6 +57,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     time: 0, aim: { x: player.x, y: player.y - 48, visible: false },
     robots: [], particles: [], shocks: [], shots: [], projectiles: [], pending: [], visitor: null, ally: null,
     supplies: supplySpots.map(spot => {
+      if (!spot.weaponId) return { ...spot };
       const index = weapons.findIndex(weapon => weapon.id === spot.weaponId);
       return { ...spot, index, weapon: weapons[index] };
     }),
@@ -67,7 +68,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     get armed() { return weaponsUnlocked && !this.dead; },
   };
   let reviveIn = 0;
-  const arsenal = createWeapons(state, player, burst, shock);
+  const arsenal = createWeapons(state, player, burst, shock, damageAlly);
   let playerCell = -1;
   let playerField;
   const queuedVisitors = [];
@@ -91,14 +92,17 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     state.shocks.push({ x, y, radius, color, life: duration, total: duration });
   }
 
-  function hitPlayer(damage, { fatal = false, ignoreProtection = fatal } = {}) {
+  function hitPlayer(damage, { fatal = false, ignoreProtection = fatal, ignoreArmor = fatal } = {}) {
     if (state.dead || (state.invulnerable > 0 && !ignoreProtection)) return;
-    player.hp = Math.max(0, player.hp - damage);
+    const absorbed = ignoreArmor ? 0 : Math.min(player.armor, damage);
+    player.armor -= absorbed;
+    player.hp = Math.max(0, player.hp - (damage - absorbed));
     state.invulnerable = Math.max(state.invulnerable, 0.65);
     state.shake = Math.max(state.shake, 0.22);
     if (player.hp > 0) return;
 
     state.dead = true;
+    player.armor = 0;
     reviveIn = fatal ? 1.55 : 1.2;
     player.moving = false;
     burst(player.x, player.y - 6, ["#f9ce9a", "#d6815f", "#884a42"], 18, 65);
@@ -119,7 +123,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
         if (distance > 140) break;
       }
     }
-    Object.assign(player, point ?? playerStart, { hp: 100, moving: false, facing: "north" });
+    Object.assign(player, point ?? playerStart, { hp: player.maxHp, armor: 0, moving: false, facing: "north" });
     arsenal.refill();
     state.dead = false;
     state.invulnerable = 1.25;
@@ -189,7 +193,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
       burst(x, y - 5, ["#fff1bb", "#ffc277", "#ff914f", "#de673c", "#6e4a3e"], 107, 265);
       burst(x, y + 2, ["#554b46", "#716054", "#353c38"], 35, 75, true);
       const distance = Math.hypot(player.x - blast.x, player.y - blast.y);
-      if (distance <= blast.radius) hitPlayer(100, { fatal: true });
+      if (distance <= blast.radius) hitPlayer(player.maxHp, { fatal: true });
       for (const robot of [...state.robots]) {
         if (Math.hypot(robot.x - blast.x, robot.y - blast.y) <= blast.radius) {
           arsenal.damageRobot(robot, gentooMobDamage, robot.x, robot.y - robot.eye);
@@ -245,7 +249,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
       visitor.labelUntil = state.time + 2.5;
       onNotice(eventText.elder);
     } else if (state.time >= visitor.swingAt) {
-      hitPlayer(1, { ignoreProtection: true });
+      hitPlayer(1, { ignoreProtection: true, ignoreArmor: true });
       visitor.swingUntil = state.time + 0.24;
       visitor.phase = "door";
     }
@@ -278,6 +282,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     let nearest;
     let nearestDistance = 144;
     for (const robot of state.robots) {
+      if (robot.reviveAt) continue;
       const distance = Math.hypot(robot.x - player.x, robot.y - player.y);
       if (distance >= nearestDistance || Math.hypot(robot.x - ally.x, robot.y - ally.y) > 164) continue;
       nearest = robot;
@@ -306,7 +311,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
         ally.nextAttack = state.time + 0.56;
         ally.attackUntil = state.time + 0.24;
         ally.attackSide = threat.x < ally.x ? -1 : 1;
-        arsenal.damageRobot(threat, 140, threat.x, threat.y - threat.eye, [allyColor, "#e7ffe6"]);
+        arsenal.damageRobot(threat, 140, threat.x, threat.y - threat.eye, { colors: [allyColor, "#e7ffe6"] });
       }
       return;
     }
@@ -356,7 +361,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
   function advanceRobots(elapsed) {
     const field = fieldTowardPlayer(player);
     for (const robot of state.robots) {
-      if (state.time < robot.ready) continue;
+      if (robot.reviveAt || state.time < robot.ready) continue;
       const gap = Math.hypot(player.x - robot.x, player.y - robot.y);
       const ally = state.ally?.phase === "guard" ? state.ally : null;
       if (ally) {
@@ -387,8 +392,10 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     }
     for (let i = 0; i < state.robots.length; i++) {
       const first = state.robots[i];
+      if (first.reviveAt) continue;
       for (let j = i + 1; j < state.robots.length; j++) {
         const second = state.robots[j];
+        if (second.reviveAt) continue;
         const dx = second.x - first.x;
         const dy = second.y - first.y;
         const gap = Math.hypot(dx, dy);
@@ -400,6 +407,21 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
         moveBody(first, -x, -y);
         moveBody(second, x, y);
       }
+    }
+  }
+
+  function reviveRobots() {
+    for (const robot of state.robots) {
+      if (!robot.reviveAt || state.time < robot.reviveAt) continue;
+      delete robot.reviveAt;
+      delete robot.nextAllyAttack;
+      robot.phase = 2;
+      robot.maxHp *= 2;
+      robot.hp = robot.maxHp;
+      robot.flash = state.time + 0.18;
+      burst(robot.x, robot.y - robot.eye, ["#ff967a", "#fff3c8"], 18, 75);
+      shock(robot.x, robot.y, 30, "#ffae81", 0.35);
+      onNotice(robot.name + " · фаза 2", true);
     }
   }
 
@@ -435,6 +457,17 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
   function collectNearbySupplies() {
     state.supplies = state.supplies.filter(supply => {
       if (Math.hypot(player.x - supply.x, player.y - supply.y) > 15) return true;
+      if (supply.kind) {
+        const armor = supply.kind === "armor";
+        const stat = armor ? "armor" : "hp";
+        const limit = armor ? player.maxArmor : player.maxHp;
+        const taken = Math.min(supply.amount, limit - player[stat]);
+        if (taken <= 0) return true;
+        player[stat] += taken;
+        onNotice((armor ? "Броня +" : "Аптечка +") + taken);
+        supply.amount -= taken;
+        return armor && supply.amount > 0;
+      }
       const loot = arsenal.collect(supply.index, supply.rounds, supply.unlock);
       if (!loot) return true;
       const message = loot.newlyOwned ? "Подобрано оружие · " + supply.weapon.name : "Боеприпасы · " + supply.weapon.name;
@@ -468,6 +501,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     state.particles = state.particles.filter(particle => particle.life > 0);
     state.shocks = state.shocks.filter(effect => effect.life > 0);
     state.shots = state.shots.filter(shot => shot.life > 0);
+    reviveRobots();
     advanceVisitor(elapsed);
     advanceAlly(elapsed, sceneElapsed);
     arsenal.update(elapsed, holding, pressed);

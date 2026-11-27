@@ -21,7 +21,7 @@ export const stations = deskRows.flatMap(y => {
   return { ...position, number, id: "PC-" + String(number).padStart(2, "0"), screen: screens[index % screens.length], hintSide: 1 };
 });
 
-export const player = { ...playerStart, facing: "north", moving: false, stride: 0, hp: 100, radius: 4 };
+export const player = { ...playerStart, facing: "north", moving: false, stride: 0, hp: 100, maxHp: 100, armor: 0, maxArmor: 100, radius: 4 };
 export const noteSpots = [
   [573, 5], [655, 23], [566, 69], [654, 91], [610, -50], [608, 149],
 ].map(([x, offset]) => ({ x, y: breakAreaTop + offset, kind: "note" }));
@@ -31,6 +31,7 @@ export const supplySpots = [
   { x: 179, y: 254, weaponId: "launcher", rounds: 4, unlock: true },
   { x: 907, y: 644, weaponId: "grenade", rounds: 2, unlock: true },
   { x: 1021, y: 481, weaponId: "flame", rounds: 10, unlock: true },
+  { x: 1114, y: 266, weaponId: "bfg", rounds: 1, unlock: true },
   { x: 408, y: 523, weaponId: "rifle", rounds: 16 },
   { x: 272, y: 305, weaponId: "rifle", rounds: 16 },
   { x: 768, y: 82, weaponId: "rifle", rounds: 16 },
@@ -42,6 +43,19 @@ export const supplySpots = [
   { x: 1002, y: 288, weaponId: "flame", rounds: 12 },
   { x: 766, y: 653, weaponId: "flame", rounds: 12 },
   { x: 246, y: 601, weaponId: "flame", rounds: 12 },
+  { x: 550, y: 696, kind: "armor", amount: 25 },
+  { x: 197, y: 479, kind: "armor", amount: 25 },
+  { x: 611, y: 107, kind: "armor", amount: 50 },
+  { x: 1110, y: 330, kind: "armor", amount: 50 },
+  { x: 958, y: 792, kind: "armor", amount: 25 },
+  { x: 301, y: 824, kind: "armor", amount: 25 },
+  { x: 652, y: 755, kind: "medkit", amount: 10 },
+  { x: 339, y: 518, kind: "medkit", amount: 25 },
+  { x: 951, y: 538, kind: "medkit", amount: 50 },
+  { x: 179, y: 692, kind: "medkit", amount: 50 },
+  { x: 1008, y: 825, kind: "medkit", amount: 25 },
+  { x: 607, y: 306, kind: "medkit", amount: 10 },
+  { x: 253, y: 165, kind: "medkit", amount: 25 },
 ];
 
 function item(kind, x, y, box) {
@@ -207,7 +221,9 @@ export function createRenderer(canvas) {
     for (const note of notes) layers.push({ depth: note.y, draw: () => drawNote(context, note, nearby === note) });
     for (const supply of action.supplies) layers.push({ depth: supply.y, draw: () => drawSupply(context, supply) });
     for (const robot of action.robots) layers.push({ depth: robot.y, draw: () => {
+      if (robot.reviveAt) context.globalAlpha = 0.58;
       drawRobot(context, robot, time);
+      context.globalAlpha = 1;
       drawBurningRobot(context, robot, time);
     } });
     const ally = action.ally;

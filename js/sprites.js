@@ -63,6 +63,18 @@ const weaponIcons = {
     ".....oooo..oxo......",
     "............oo......",
   ],
+  bfg: [
+    "........ooooooo.....",
+    "....ooooo+++++oo....",
+    "..ooo+++oxxxxxxo....",
+    ".ooxxx+++o+++++oooo.",
+    ".oxx+++xxoxxxxxxxxxo",
+    ".oxxxxxxoooo+++++oxo",
+    "..oooxxxxoooooooooo.",
+    "....ooxxxo.oxxo.....",
+    ".....oooo...oo......",
+    "....................",
+  ],
 };
 
 export function drawWeaponIcon(ctx, weapon) {
@@ -75,14 +87,28 @@ export function drawWeaponIcon(ctx, weapon) {
   }
 }
 
-export function drawSupply(ctx, { x, y, unlock, weapon }) {
-  const edge = unlock ? "#add5ba" : "#e1b573";
+export function drawSupply(ctx, { x, y, unlock, weapon, kind, amount }) {
+  const edge = kind === "armor" ? "#8bc6ea" : kind === "medkit" ? "#efad9f" : unlock ? "#add5ba" : "#e1b573";
   box(ctx, "#101b16af", x - 10, y - 1, 22, 7);
   box(ctx, "#142820", x - 12, y - 10, 24, 14);
   box(ctx, edge, x - 12, y - 10, 24, 1);
   box(ctx, edge, x - 12, y + 3, 24, 1);
   box(ctx, edge, x - 12, y - 9, 1, 12);
   box(ctx, edge, x + 11, y - 9, 1, 12);
+  if (kind === "armor") {
+    box(ctx, "#b8dff1", x - 9, y - 8, 7, 6);
+    box(ctx, "#64a9dc", x - 8, y - 3, 5, 3);
+    box(ctx, "#64a9dc", x - 7, y, 3, 1);
+    label(ctx, String(amount), x + 4, y - 7, edge);
+    return;
+  }
+  if (kind === "medkit") {
+    box(ctx, "#f4dfc9", x - 10, y - 7, 9, 8);
+    box(ctx, "#af4e4e", x - 6, y - 6, 1, 5);
+    box(ctx, "#af4e4e", x - 8, y - 4, 5, 1);
+    label(ctx, String(amount), x + 5, y - 7, edge);
+    return;
+  }
   if (unlock) {
     ctx.save();
     ctx.translate(x - 11, y - 9);
@@ -98,9 +124,10 @@ export function drawSupply(ctx, { x, y, unlock, weapon }) {
 }
 
 function playerStatus(player, weapon) {
-  const height = weapon ? 27 : 16;
-  const half = weapon ? Math.max(21, Math.ceil(textWidth(weapon.name) / 2) + 4) : 21;
-  return { x: Math.round(player.x), y: Math.round(player.y) - 24 - height, half, height };
+  const height = weapon ? 41 : 30;
+  const armorLabel = "Броня " + player.armor;
+  const half = Math.max(21, Math.ceil(Math.max(textWidth(weapon?.name ?? ""), textWidth(armorLabel)) / 2) + 4);
+  return { x: Math.round(player.x), y: Math.round(player.y) - 24 - height, half, height, armorLabel };
 }
 
 export function drawPlayer(ctx, player, action, time) {
@@ -149,9 +176,12 @@ export function drawPlayer(ctx, player, action, time) {
   const status = playerStatus(player, weapon);
   box(ctx, "#111e17", x - status.half, status.y, status.half * 2, status.height);
   if (weapon) label(ctx, weapon.name, x, status.y + 2, weapon.color);
-  label(ctx, player.hp + " HP", x, y - 37, "#fff3d8");
-  box(ctx, "#653b39", x - 17, y - 28, 34, 3);
-  box(ctx, player.hp > 35 ? "#8fd39b" : "#fa8d79", x - 17, y - 28, Math.ceil(34 * player.hp / 100), 3);
+  label(ctx, player.hp + " HP", x, y - 51, "#fff3d8");
+  box(ctx, "#653b39", x - 17, y - 42, 34, 3);
+  box(ctx, player.hp > 35 ? "#8fd39b" : "#fa8d79", x - 17, y - 42, Math.ceil(34 * player.hp / player.maxHp), 3);
+  label(ctx, status.armorLabel, x, y - 37, "#b6ddfb");
+  box(ctx, "#30526a", x - 17, y - 28, 34, 3);
+  box(ctx, "#72b9ed", x - 17, y - 28, Math.ceil(34 * player.armor / player.maxArmor), 3);
 }
 
 export function drawWeapon(ctx, player, aim, weapon, laser) {
@@ -270,7 +300,7 @@ export function drawRobot(ctx, robot, time) {
   const white = time < robot.flash;
   if (robot.kind === "walker") {
     const leg = Math.round(walk * 3);
-    const body = white ? "#fbfff0" : "#c2ad73";
+    const body = white ? "#fbfff0" : robot.phase === 2 ? "#d08367" : "#c2ad73";
     box(ctx, "#14221b", x - 13, y - 2, 26, 4);
     for (const side of [-1, 1]) {
       const dx = side * 7;
@@ -293,7 +323,7 @@ export function drawRobot(ctx, robot, time) {
   const agent = robot.kind === "agent";
   const size = agent ? 13 : small ? 5 : 9;
   const centerY = y - (size - 1);
-  const metal = white ? "#faf9e3" : small ? "#b89a78" : "#b9aca2";
+  const metal = white ? "#faf9e3" : robot.phase === 2 ? "#c68975" : small ? "#b89a78" : "#b9aca2";
   const eye = agent ? robot.color : small ? "#f6a071" : "#ff7761";
   box(ctx, "#14231bd0", x - size - 4, y - 2, (size + 4) * 2, 4);
   for (const side of [-1, 1]) {
@@ -382,7 +412,7 @@ export function drawRobotTags(ctx, robots, livingPlayer, camera, weapon = null, 
     const anchorX = Math.round(robot.x);
     const feetY = Math.round(robot.y);
     const anchorY = feetY - robotTopOffset[robot.kind];
-    const hp = robot.hp + " HP";
+    const hp = robot.reviveAt ? "Перезапуск" : robot.hp + " HP";
     const half = Math.ceil(Math.max(textWidth(robot.name), textWidth(hp)) / 2) + 4;
     visible.push({ anchorX, anchorY, feetY, half, hp, robot });
   }
@@ -407,11 +437,12 @@ export function drawRobotTags(ctx, robots, livingPlayer, camera, weapon = null, 
   for (const { x, y, half, height, hp, robot } of tags) {
     const barLeft = x - 17;
     const friendly = robot === ally;
+    const fill = robot.hp > 0 ? Math.max(1, Math.floor(34 * robot.hp / robot.maxHp)) : 0;
     box(ctx, "#17251ff0", x - half, y, 2 * half, height);
     label(ctx, robot.name, x, y + 2, robot.color);
     label(ctx, hp, x, y + 10, "#fff3d8");
     box(ctx, friendly ? "#3a5c49" : "#634442", barLeft, y + 18, 34, 3);
-    box(ctx, friendly ? robot.color : "#ee8a75", barLeft, y + 18, Math.max(1, Math.floor(34 * robot.hp / robot.maxHp)), 3);
+    box(ctx, friendly ? robot.color : "#ee8a75", barLeft, y + 18, fill, 3);
   }
 }
 
@@ -567,8 +598,11 @@ export function drawEffects(ctx, action, time) {
   for (const projectile of action.projectiles) {
     const { x, y, weapon } = projectile;
     if (weapon.kind === "rocket") {
-      line(ctx, "#e879456e", x - projectile.dx * 15, y - projectile.dy * 15, x, y, 2);
-      pixels(ctx, "#fff0ab", x - 1, y - 1, 4);
+      const bfg = weapon.id === "bfg";
+      const tail = bfg ? 25 : 15;
+      line(ctx, bfg ? "#7ae88eaa" : "#e879456e", x - projectile.dx * tail, y - projectile.dy * tail, x, y, bfg ? 4 : 2);
+      if (bfg) pixels(ctx, weapon.color, x - 4, y - 4, 9);
+      pixels(ctx, bfg ? "#eaffd4" : "#fff0ab", x - 1, y - 1, 4);
     } else {
       pixels(ctx, "#14211bc0", x - 2, y - 1, 5);
       pixels(ctx, "#718650", x - 2, y - projectile.lift - 2, 5);

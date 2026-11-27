@@ -17,6 +17,7 @@ const noteDialog = byId("note");
 const noteList = byId("tasks");
 const hintPanel = byId("station-hint");
 const health = byId("health");
+const armor = byId("armor");
 const death = byId("death");
 const weaponSlots = byId("weapon-slots");
 const allyTimer = byId("ally-timer");
@@ -250,7 +251,7 @@ window.addEventListener("keydown", event => {
     return;
   }
   if (achievements.isOpen || action.state.dead) return;
-  const weaponKey = /^(?:Digit|Numpad)([1-5])$/.exec(event.code);
+  const weaponKey = /^(?:Digit|Numpad)([1-6])$/.exec(event.code);
   if (weaponKey && action.state.armed) {
     event.preventDefault();
     action.selectWeapon(Number(weaponKey[1]) - 1);
@@ -377,6 +378,7 @@ function frame(time) {
   }
   updateInteraction(paused);
   if (health.value !== String(player.hp)) health.value = String(player.hp);
+  if (armor.value !== String(player.armor)) armor.value = String(player.armor);
   if (death.hidden === action.state.dead) death.hidden = !action.state.dead;
   while (activeNotices[0]?.expires <= action.state.time) activeNotices.shift().element.remove();
   canvas.classList.toggle("armed", action.state.armed);
