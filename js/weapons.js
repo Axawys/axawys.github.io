@@ -2,11 +2,11 @@ import { gunRay } from "./pixels.js";
 import { isWalkable } from "./room.js";
 
 export const weapons = [
-  { id: "pistol", kind: "bullet", name: "Пистолет", capacity: 12, length: 8, thickness: 2, color: "#d8d6bd", range: 430, damage: 38, cooldown: 0.26 },
-  { id: "launcher", kind: "rocket", name: "Гранатомёт", capacity: 2, length: 18, thickness: 5, color: "#d7a67d", range: 320, radius: 44, damage: 108, cooldown: 0.7 },
-  { id: "grenade", kind: "grenade", name: "Гранаты", capacity: 2, length: 7, color: "#aaca88", range: 155, radius: 55, damage: 128, cooldown: 0.78 },
-  { id: "flame", kind: "flame", name: "Огнемёт", capacity: 30, length: 15, thickness: 4, color: "#f9b06e", range: 96, damage: 12, cooldown: 0.09, automatic: true },
-  { id: "rifle", kind: "bullet", name: "Автомат", capacity: 30, length: 13, thickness: 3, color: "#a8b7a5", range: 560, damage: 24, cooldown: 0.105, automatic: true },
+  { id: "pistol", kind: "bullet", name: "Пистолет", capacity: Infinity, length: 8, thickness: 2, color: "#d8d6bd", range: 430, damage: 38, cooldown: 0.26 },
+  { id: "launcher", kind: "rocket", name: "Гранатомёт", capacity: 20, length: 18, thickness: 5, color: "#d7a67d", range: 320, radius: 44, damage: 108, cooldown: 0.7 },
+  { id: "grenade", kind: "grenade", name: "Гранаты", capacity: 6, length: 7, color: "#aaca88", range: 155, radius: 55, damage: 128, cooldown: 0.78 },
+  { id: "flame", kind: "flame", name: "Огнемёт", capacity: 40, length: 15, thickness: 4, color: "#f9b06e", range: 96, damage: 12, cooldown: 0.09, automatic: true },
+  { id: "rifle", kind: "bullet", name: "Автомат", capacity: 50, length: 13, thickness: 3, color: "#a8b7a5", range: 560, damage: 24, cooldown: 0.105, automatic: true },
 ];
 
 function wallDistance(x, y, dx, dy, range) {
@@ -192,7 +192,7 @@ export function createWeapons(state, player, burst, shock) {
     if (!pressed && !(holding && weapon.automatic)) return;
 
     const ray = gunRay(player, state.aim, weapon.length);
-    ammo[selected]--;
+    if (ammo[selected] !== Infinity) ammo[selected]--;
     switch (weapon.kind) {
       case "bullet": fireBullet(ray, weapon); break;
       case "rocket": launchRocket(ray, weapon); break;

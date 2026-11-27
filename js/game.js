@@ -76,11 +76,14 @@ function updateWeaponSlots() {
   if (!armed) return;
   for (const [index, button] of slotButtons.entries()) {
     if (weapon !== shownWeapon) button.slot.setAttribute("aria-pressed", String(weapons[index] === weapon));
-    const count = String(ammo[index]);
+    const remaining = ammo[index];
+    const unlimited = remaining === Infinity;
+    const count = unlimited ? "∞" : String(remaining);
     if (button.ammo.textContent === count) continue;
     button.ammo.textContent = count;
-    button.slot.classList.toggle("empty", ammo[index] === 0);
-    button.slot.setAttribute("aria-label", weapons[index].name + " · боезапас " + count);
+    button.slot.classList.toggle("empty", remaining === 0);
+    const ammoLabel = unlimited ? "бесконечный боезапас" : "боезапас " + count;
+    button.slot.setAttribute("aria-label", weapons[index].name + " · " + ammoLabel);
   }
   shownWeapon = weapon;
 }
