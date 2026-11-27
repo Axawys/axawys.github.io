@@ -368,8 +368,8 @@ function findTagPosition(occupied, view, anchorX, anchorY, feetY, half, height, 
   return findSpareTagPosition(occupied, view, center, above, half, height);
 }
 
-export function drawRobotTags(ctx, robots, livingPlayer, camera, weapon = null) {
-  if (!robots.length) return;
+export function drawRobotTags(ctx, robots, livingPlayer, camera, weapon = null, ally = null) {
+  if (!robots.length && !ally) return;
   const left = Math.round(camera.x);
   const top = Math.round(camera.y);
   const view = { left: left + 3, right: left + camera.w - 3, top: top + 3, bottom: top + camera.h - 3 };
@@ -377,7 +377,7 @@ export function drawRobotTags(ctx, robots, livingPlayer, camera, weapon = null) 
   const visible = [];
   const tagHeight = 23;
   const occupied = livingPlayer ? [playerStatus(livingPlayer, weapon)] : [];
-  for (const robot of robots) {
+  for (const robot of ally ? [ally, ...robots] : robots) {
     if (robot.x < left - 12 || robot.x > view.right + 15 || robot.y < top || robot.y > view.bottom + 33) continue;
     const anchorX = Math.round(robot.x);
     const feetY = Math.round(robot.y);
@@ -406,11 +406,12 @@ export function drawRobotTags(ctx, robots, livingPlayer, camera, weapon = null) 
   }
   for (const { x, y, half, height, hp, robot } of tags) {
     const barLeft = x - 17;
+    const friendly = robot === ally;
     box(ctx, "#17251ff0", x - half, y, 2 * half, height);
     label(ctx, robot.name, x, y + 2, robot.color);
     label(ctx, hp, x, y + 10, "#fff3d8");
-    box(ctx, "#634442", barLeft, y + 18, 34, 3);
-    box(ctx, "#ee8a75", barLeft, y + 18, Math.max(1, Math.floor(34 * robot.hp / robot.maxHp)), 3);
+    box(ctx, friendly ? "#3a5c49" : "#634442", barLeft, y + 18, 34, 3);
+    box(ctx, friendly ? robot.color : "#ee8a75", barLeft, y + 18, Math.max(1, Math.floor(34 * robot.hp / robot.maxHp)), 3);
   }
 }
 

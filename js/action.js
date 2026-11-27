@@ -15,6 +15,7 @@ const gentooFire = 3;
 const gentooRadius = 106;
 const allyDuration = 60;
 const allySpeed = 138;
+const allyMaxHp = 500;
 const allyColor = "#91e6b2";
 const celebrationDuration = 10;
 const fireworkColors = ["#ffb578", "#92c9ff", "#f7dc8e", "#e9a1df", "#9af0bd"];
@@ -153,7 +154,10 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
       if (state.ally) return;
       const point = nearFree(station.x + 25, station.y + 45, 6) ?? nearFree(player.x, player.y, 6);
       if (!point) return;
-      state.ally = { ...point, radius: 6, stride: 0, phase: "guard", remaining: allyDuration, nextAttack: state.time };
+      state.ally = {
+        ...point, kind: "furry", name: "Фурри-союзник", color: allyColor, radius: 6,
+        hp: allyMaxHp, maxHp: allyMaxHp, stride: 0, phase: "guard", remaining: allyDuration, nextAttack: state.time,
+      };
       burst(point.x, point.y - 12, [allyColor, "#e0f8d8"], 16, 66);
       onNotice("Фурри-союзник пришёл на помощь");
       return;
@@ -318,25 +322,53 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     return playerField;
   }
 
+  function attackAlly(robot, ally) {
+    if (state.time < (robot.nextAllyAttack ?? 0)) return;
+    robot.nextAllyAttack = state.time + 0.65;
+    if (robot.kind === "furry") {
+      robot.attackUntil = state.time + 0.19;
+      robot.attackSide = ally.x < robot.x ? -1 : 1;
+    }
+
+    ally.hp = Math.max(0, ally.hp - robot.damage);
+    ally.flash = state.time + 0.14;
+    if (ally.hp > 0) {
+      burst(ally.x, ally.y - 15, [allyColor, "#ffba8a"], 5, 58);
+      return;
+    }
+
+    burst(ally.x, ally.y - 15, [allyColor, "#d9e7d3", "#627dab"], 22, 90);
+    state.ally = null;
+    onNotice("Фурри-союзник погиб", true);
+  }
+
   function advanceRobots(elapsed) {
     const field = fieldTowardPlayer(player);
-    const ally = state.ally?.phase === "guard" ? state.ally : null;
     for (const robot of state.robots) {
       if (state.time < robot.ready) continue;
       const gap = Math.hypot(player.x - robot.x, player.y - robot.y);
+      const ally = state.ally?.phase === "guard" ? state.ally : null;
       if (ally) {
         const dx = ally.x - robot.x;
         const dy = ally.y - robot.y;
         const allyGap = Math.hypot(dx, dy);
         const intercepted = allyGap < 34 || (allyGap < 52 && allyGap < gap + 6);
         if (intercepted && clearPath(robot, ally)) {
-          const travel = Math.min(robot.speed * elapsed, allyGap - robot.radius - ally.radius - 1);
-          if (travel > 0 && moveBody(robot, dx * travel / allyGap, dy * travel / allyGap)) robot.stride += elapsed * 13;
+          const reach = robot.radius + ally.radius + 1;
+          if (allyGap <= reach + 0.1) {
+            attackAlly(robot, ally);
+          } else {
+            const travel = Math.min(robot.speed * elapsed, allyGap - reach);
+            if (moveBody(robot, dx * travel / allyGap, dy * travel / allyGap)) robot.stride += elapsed * 13;
+          }
           continue;
         }
       }
       if (gap < robot.radius + player.radius + 1) {
-        if (robot.kind === "furry" && !state.invulnerable && !state.dead) robot.attackUntil = state.time + 0.19;
+        if (robot.kind === "furry" && !state.invulnerable) {
+          robot.attackUntil = state.time + 0.19;
+          robot.attackSide = player.x < robot.x ? -1 : 1;
+        }
         hitPlayer(robot.damage);
         continue;
       }
