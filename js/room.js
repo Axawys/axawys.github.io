@@ -1,6 +1,6 @@
 import { label } from "./pixel-font.js";
-import { box, pixels } from "./pixels.js";
-import { drawBlastZones, drawEffects, drawPlayer, drawRobot, drawRobotTags, drawVisitor, drawWeapon } from "./sprites.js";
+import { box } from "./pixels.js";
+import { drawBlastZones, drawEffects, drawPlayer, drawRobot, drawRobotTags, drawSupply, drawVisitor, drawWeapon } from "./sprites.js";
 
 export const width = 1220;
 export const height = 966;
@@ -25,6 +25,24 @@ export const player = { ...playerStart, facing: "north", moving: false, stride: 
 export const noteSpots = [
   [573, 5], [655, 23], [566, 69], [654, 91], [610, -50], [608, 149],
 ].map(([x, offset]) => ({ x, y: breakAreaTop + offset, kind: "note" }));
+
+export const supplySpots = [
+  { x: 635, y: 695, weaponId: "rifle", rounds: 12, unlock: true },
+  { x: 179, y: 254, weaponId: "launcher", rounds: 4, unlock: true },
+  { x: 907, y: 644, weaponId: "grenade", rounds: 2, unlock: true },
+  { x: 1021, y: 481, weaponId: "flame", rounds: 10, unlock: true },
+  { x: 408, y: 523, weaponId: "rifle", rounds: 16 },
+  { x: 272, y: 305, weaponId: "rifle", rounds: 16 },
+  { x: 768, y: 82, weaponId: "rifle", rounds: 16 },
+  { x: 150, y: 474, weaponId: "launcher", rounds: 6 },
+  { x: 762, y: 498, weaponId: "launcher", rounds: 6 },
+  { x: 970, y: 103, weaponId: "launcher", rounds: 6 },
+  { x: 1074, y: 601, weaponId: "grenade", rounds: 2 },
+  { x: 450, y: 74, weaponId: "grenade", rounds: 2 },
+  { x: 1002, y: 288, weaponId: "flame", rounds: 12 },
+  { x: 766, y: 653, weaponId: "flame", rounds: 12 },
+  { x: 246, y: 601, weaponId: "flame", rounds: 12 },
+];
 
 function item(kind, x, y, box) {
   return { kind, x, y, box: box.map((side, index) => side + (index % 2 ? y : x)) };
@@ -186,7 +204,8 @@ export function createRenderer(canvas) {
         draw: () => drawDesk(context, station, station === nearby, visited.has(station.number), time * 1000, hot),
       });
     }
-    for (const note of notes) layers.push({ depth: note.y, draw: () => drawNote(context, note, nearby === note, time) });
+    for (const note of notes) layers.push({ depth: note.y, draw: () => drawNote(context, note, nearby === note) });
+    for (const supply of action.supplies) layers.push({ depth: supply.y, draw: () => drawSupply(context, supply) });
     for (const robot of action.robots) layers.push({ depth: robot.y, draw: () => drawRobot(context, robot, time) });
     if (action.visitor) layers.push({ depth: action.visitor.y, draw: () => drawVisitor(context, action.visitor, time, player) });
     layers.push({ depth: player.y, draw: () => {
@@ -475,7 +494,7 @@ function drawFurniture(ctx, { x, y, kind, box: bounds }, time) {
   box(ctx, "#88a97a", x - 1, y - 8, 3, 5);
 }
 
-function drawNote(ctx, note, nearby, time) {
+function drawNote(ctx, note, nearby) {
   const x = note.x;
   const y = note.y;
   const hint = Boolean(note.station);
@@ -483,5 +502,4 @@ function drawNote(ctx, note, nearby, time) {
   box(ctx, hint ? (nearby ? "#d1f4e3" : "#9ccab9") : (nearby ? "#fff0bb" : "#e7ce91"), x - 6, y - 6, 12, 9);
   box(ctx, hint ? "#c2e3d2" : "#f3e1ab", x - 6, y - 6, 10, 1);
   for (let row = -4; row <= 0; row += 2) box(ctx, hint ? "#496f62" : "#8b7144", x - 4, y + row, 6, 1);
-  if (Math.sin(time * 2.5) > 0.45) pixels(ctx, hint ? "#bdebd4" : "#ffe4a2", x + 9, y - 8, 2);
 }

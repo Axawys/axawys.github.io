@@ -75,6 +75,28 @@ export function drawWeaponIcon(ctx, weapon) {
   }
 }
 
+export function drawSupply(ctx, { x, y, unlock, weapon }) {
+  const edge = unlock ? "#add5ba" : "#e1b573";
+  box(ctx, "#101b16af", x - 10, y - 1, 22, 7);
+  box(ctx, "#142820", x - 12, y - 10, 24, 14);
+  box(ctx, edge, x - 12, y - 10, 24, 1);
+  box(ctx, edge, x - 12, y + 3, 24, 1);
+  box(ctx, edge, x - 12, y - 9, 1, 12);
+  box(ctx, edge, x + 11, y - 9, 1, 12);
+  if (unlock) {
+    ctx.save();
+    ctx.translate(x - 11, y - 9);
+    drawWeaponIcon(ctx, weapon);
+    ctx.restore();
+    return;
+  }
+  for (const offset of [-6, 0, 6]) {
+    box(ctx, weapon.color, x + offset - 1, y - 7, 3, 8);
+    box(ctx, "#f7d593", x + offset, y - 8, 1, 2);
+    box(ctx, "#835f38", x + offset - 1, y, 3, 1);
+  }
+}
+
 function playerStatus(player, weapon) {
   const height = weapon ? 27 : 16;
   const half = weapon ? Math.max(21, Math.ceil(textWidth(weapon.name) / 2) + 4) : 21;

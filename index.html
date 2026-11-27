@@ -17,11 +17,9 @@
   <main class="game" id="game">
     <canvas id="room" tabindex="0" aria-label="Офис Linux Lab. Двигайтесь на WASD или стрелках. Нажмите E рядом с компьютером или запиской, O открывает достижения, Esc ставит игру на паузу."></canvas>
     <button class="interact" id="interact" type="button" hidden><kbd aria-hidden="true">E</kbd><span></span></button>
-    <div id="move-joystick" class="move-joystick" aria-hidden="true" hidden><span></span></div>
-    <div class="touch-menu">
-      <button id="open-pause" type="button">Пауза</button>
-      <button id="open-achievements" type="button">Достижения</button>
-    </div>
+    <div id="move-joystick" class="floating-joystick" aria-hidden="true" hidden><span></span></div>
+    <div id="aim-joystick" class="floating-joystick aim-joystick" aria-hidden="true" hidden><span></span></div>
+    <button id="open-pause" class="touch-pause" type="button">Пауза</button>
     <p id="death" role="status" hidden>Вы погибли</p>
     <div id="weapon-slots" class="weapon-slots" role="group" aria-label="Выбор оружия" hidden></div>
     <div id="event-notices" class="event-notices" role="log" aria-label="События в офисе"></div>
@@ -45,11 +43,13 @@
       <div>
         <dt>Оружие</dt>
         <dd class="guide-keyboard"><kbd>ЛКМ</kbd> — стрелять. Меняйте оружие на <kbd>1–5</kbd>, колёсиком или нажатием на слот.</dd>
-        <dd class="guide-touch">Коснитесь правой половины карты, чтобы прицелиться и выстрелить. Выбирайте оружие нажатием на слот.</dd>
+        <dd class="guide-touch">В бою коснитесь правой половины карты и сдвиньте палец, чтобы прицеливаться и стрелять. Выбирайте оружие нажатием на слот.</dd>
+        <dd>Пройдите по оружию или боеприпасам, чтобы подобрать их.</dd>
       </div>
       <div>
         <dt>Достижения</dt>
-        <dd><kbd>O</kbd><span class="guide-keyboard"> — открыть или закрыть</span><span class="guide-touch-inline"> или кнопка «Достижения» внизу справа</span></dd>
+        <dd class="guide-keyboard"><kbd>O</kbd> — открыть или закрыть</dd>
+        <dd class="guide-touch">В меню паузы.</dd>
       </div>
       <div>
         <dt>Пауза</dt>

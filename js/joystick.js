@@ -1,7 +1,7 @@
 const radius = 33;
 const deadZone = 7;
 
-export function createJoystick(canvas, indicator) {
+export function createJoystick(canvas, indicator, side) {
   const thumb = indicator.querySelector("span");
   let active;
   let lastTouch;
@@ -10,7 +10,7 @@ export function createJoystick(canvas, indicator) {
     if (event.pointerType !== "touch") return false;
     const bounds = canvas.getBoundingClientRect();
     const x = event.clientX - bounds.left;
-    if (x >= bounds.width / 2) return false;
+    if (side !== (x < bounds.width / 2 ? "left" : "right")) return false;
     event.preventDefault();
     if (active) return true;
 

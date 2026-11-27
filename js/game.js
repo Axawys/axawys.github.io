@@ -32,7 +32,8 @@ const notes = [note, ...stations.map((station, index) => ({
 }))];
 
 const renderer = createRenderer(canvas);
-const joystick = createJoystick(canvas, byId("move-joystick"));
+const moveStick = createJoystick(canvas, byId("move-joystick"), "left");
+const aimStick = createJoystick(canvas, byId("aim-joystick"), "right");
 const achievementTasks = tasks.filter(task => task.achievement);
 const achievements = createAchievements([...achievementTasks, finaleAchievement], () => canvas.focus({ preventScroll: true }));
 const action = createAction(showNotice, () => achievements.unlock(finaleAchievement));
@@ -72,19 +73,22 @@ const slotButtons = weapons.map((weapon, index) => {
 let shownWeapon;
 
 function updateWeaponSlots() {
-  const { armed, weapon, ammo } = action.state;
+  const { armed, weapon, ammo, owned } = action.state;
   if (weaponSlots.hidden === armed) weaponSlots.hidden = !armed;
   if (!armed) return;
   for (const [index, button] of slotButtons.entries()) {
     if (weapon !== shownWeapon) button.slot.setAttribute("aria-pressed", String(weapons[index] === weapon));
     const remaining = ammo[index];
+    const locked = !owned[index];
     const unlimited = remaining === Infinity;
-    const count = unlimited ? "∞" : String(remaining);
-    if (button.ammo.textContent === count) continue;
+    const count = unlimited ? "∞" : locked && !remaining ? "—" : String(remaining);
+    if (button.ammo.textContent === count && button.slot.disabled === locked) continue;
+    button.slot.disabled = locked;
     button.ammo.textContent = count;
-    button.slot.classList.toggle("empty", remaining === 0);
-    const ammoLabel = unlimited ? "бесконечный боезапас" : "боезапас " + count;
-    button.slot.setAttribute("aria-label", weapons[index].name + " · " + ammoLabel);
+    button.slot.classList.toggle("empty", !locked && remaining === 0);
+    const ammoLabel = unlimited ? "бесконечный боезапас" : "боезапас " + remaining;
+    const availability = locked ? " · ещё не подобрано" : "";
+    button.slot.setAttribute("aria-label", weapons[index].name + availability + " · " + ammoLabel);
   }
   shownWeapon = weapon;
 }
@@ -170,7 +174,8 @@ function toggleAchievements(pause = false) {
 
 function resetInput() {
   keys.clear();
-  joystick.reset();
+  moveStick.reset();
+  aimStick.reset();
   stopShooting();
   shotRequest = undefined;
   interactionKeyHeld = false;
@@ -199,7 +204,6 @@ function updateInteraction(paused) {
 interactButton.addEventListener("click", interact);
 byId("start-game").addEventListener("click", () => controlsDialog.close());
 controlsDialog.addEventListener("close", () => canvas.focus({ preventScroll: true }));
-byId("open-achievements").addEventListener("click", () => toggleAchievements());
 byId("open-pause").addEventListener("click", () => toggleAchievements(true));
 byId("close-note").addEventListener("click", closeNote);
 noteDialog.addEventListener("cancel", event => {
@@ -270,47 +274,69 @@ byId("game").addEventListener("wheel", event => {
   action.cycleWeapon(event.deltaY);
 }, { passive: false });
 
-function aim(event) {
-  if (event.pointerType === "touch" && event.pointerId !== shootingPointer) return;
-  pointer = { x: event.clientX, y: event.clientY, type: event.pointerType };
-}
-
 function stopShooting() {
   if (shootingPointer === undefined) return;
   if (canvas.hasPointerCapture(shootingPointer)) canvas.releasePointerCapture(shootingPointer);
   shootingPointer = undefined;
-  if (pointer?.type === "touch") pointer = undefined;
 }
 
 canvas.addEventListener("pointermove", event => {
-  if (!joystick.move(event)) aim(event);
+  if (moveStick.move(event) || aimStick.move(event) || event.pointerType === "touch") return;
+  pointer = { x: event.clientX, y: event.clientY };
 });
 canvas.addEventListener("pointerdown", event => {
   if (event.button !== 0 || action.state.dead || gamePaused()) return;
   canvasPressArmed = action.state.armed;
-  if (joystick.start(event)) return;
+  if (event.pointerType === "touch") {
+    pointer = undefined;
+    if (!moveStick.start(event) && canvasPressArmed) aimStick.start(event);
+    return;
+  }
   if (!canvasPressArmed || shootingPointer !== undefined) return;
   shootingPointer = event.pointerId;
   canvas.setPointerCapture(event.pointerId);
-  aim(event);
+  pointer = { x: event.clientX, y: event.clientY };
   shotRequest = pointer;
   event.preventDefault();
 });
 function releaseAim(event) {
-  if (joystick.release(event)) return;
-  if (event.pointerType === "touch" && event.pointerId !== shootingPointer) return;
+  if (moveStick.release(event) || aimStick.release(event) || event.pointerType === "touch") return;
   if (event.pointerId !== shootingPointer && event.type !== "pointerleave") return;
   if (event.type !== "pointerleave") shootingPointer = undefined;
-  if (event.pointerType === "touch" || event.type === "pointerleave") pointer = undefined;
+  if (event.type === "pointerleave") pointer = undefined;
 }
 for (const type of ["pointerup", "pointercancel", "pointerleave", "lostpointercapture"]) {
   canvas.addEventListener(type, releaseAim);
 }
 canvas.addEventListener("click", event => {
-  if (canvasPressArmed || action.state.armed || !nearby || joystick.blocksClick(event)) return;
+  if (canvasPressArmed || action.state.armed || !nearby || moveStick.blocksClick(event) || aimStick.blocksClick(event)) return;
   const point = renderer.worldPoint(event.clientX, event.clientY);
   if (Math.abs(point.x - nearby.x) < 34 && Math.abs(point.y - nearby.y) < 33) interact();
 });
+
+function updateAim() {
+  const { aim, weapon } = action.state;
+  const deflection = Math.hypot(aimStick.x, aimStick.y);
+  if (deflection > 0) {
+    const { w, h } = renderer.camera;
+    const grenade = weapon.kind === "grenade";
+    const distance = grenade ? 24 + (weapon.range - 24) * deflection : Math.min(weapon.range, Math.max(26, Math.min(w, h) * 0.46));
+    aim.x = player.x + aimStick.x * distance / deflection;
+    aim.y = player.y - (grenade ? 0 : 9) + aimStick.y * distance / deflection;
+    aim.visible = true;
+    return true;
+  }
+  const target = pointer ?? shotRequest;
+  if (target) {
+    Object.assign(aim, renderer.worldPoint(target.x, target.y), {
+      visible: Boolean(pointer) && target.x >= 0 && target.x <= canvas.clientWidth
+        && target.y >= 0 && target.y <= canvas.clientHeight,
+    });
+  } else {
+    aim.visible = false;
+  }
+  return false;
+}
 
 function frame(time) {
   const frameElapsed = previousTime === undefined ? 0 : (time - previousTime) / 1000;
@@ -318,23 +344,18 @@ function frame(time) {
   previousTime = time;
   const paused = gamePaused();
   const canMove = !paused && !action.state.dead;
-  const dx = joystick.x + Number(keys.has("KeyD") || keys.has("ArrowRight")) - Number(keys.has("KeyA") || keys.has("ArrowLeft"));
-  const dy = joystick.y + Number(keys.has("KeyS") || keys.has("ArrowDown")) - Number(keys.has("KeyW") || keys.has("ArrowUp"));
+  const dx = moveStick.x + Number(keys.has("KeyD") || keys.has("ArrowRight")) - Number(keys.has("KeyA") || keys.has("ArrowLeft"));
+  const dy = moveStick.y + Number(keys.has("KeyS") || keys.has("ArrowDown")) - Number(keys.has("KeyW") || keys.has("ArrowUp"));
   movePlayer(canMove ? dx : 0, canMove ? dy : 0, elapsed);
   renderer.follow(elapsed, false);
-  const target = pointer ?? shotRequest;
-  if (target) {
-    Object.assign(action.state.aim, renderer.worldPoint(target.x, target.y), {
-      visible: Boolean(pointer) && target.x >= 0 && target.x <= canvas.clientWidth
-        && target.y >= 0 && target.y <= canvas.clientHeight,
-    });
-  } else {
-    action.state.aim.visible = false;
-  }
-  const respawned = !paused && action.update(elapsed, shootingPointer !== undefined, Boolean(shotRequest), frameElapsed);
+  const touchFiring = updateAim();
+  const respawned = !paused && action.update(elapsed, shootingPointer !== undefined, Boolean(shotRequest) || touchFiring, frameElapsed);
   shotRequest = undefined;
-  if (!action.state.armed) stopShooting();
-  if (action.state.dead) joystick.reset();
+  if (!action.state.armed) {
+    stopShooting();
+    aimStick.reset();
+  }
+  if (action.state.dead) moveStick.reset();
   if (respawned) {
     resetInput();
     renderer.follow(elapsed, true);

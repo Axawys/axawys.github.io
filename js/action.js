@@ -1,6 +1,6 @@
-import { door, height, isWalkable, moveBody, player, playerStart, width } from "./room.js";
+import { door, height, isWalkable, moveBody, player, playerStart, supplySpots, width } from "./room.js";
 import { makeField, nearestCell, pursue } from "./navigation.js";
-import { createWeapons } from "./weapons.js";
+import { createWeapons, weapons } from "./weapons.js";
 
 const robotTypes = {
   spider: { name: "Паук Ubuntu", radius: 5, hitRadius: 10, eye: 8, maxHp: 1100, speed: 88, damage: 24, color: "#ff947a" },
@@ -50,8 +50,13 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
   const state = {
     time: 0, aim: { x: player.x, y: player.y - 48, visible: false },
     robots: [], particles: [], shocks: [], shots: [], projectiles: [], pending: [], visitor: null,
+    supplies: supplySpots.map(spot => {
+      const index = weapons.findIndex(weapon => weapon.id === spot.weaponId);
+      return { ...spot, index, weapon: weapons[index] };
+    }),
     dead: false, invulnerable: 0, shake: 0, celebration: null, medal: false,
     get ammo() { return arsenal.ammo; },
+    get owned() { return arsenal.owned; },
     get weapon() { return arsenal.equipped; },
     get armed() { return !this.dead && this.robots.length > 0; },
   };
@@ -311,6 +316,19 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     }
   }
 
+  function collectNearbySupplies() {
+    state.supplies = state.supplies.filter(supply => {
+      if (Math.hypot(player.x - supply.x, player.y - supply.y) > 15) return true;
+      const loot = arsenal.collect(supply.index, supply.rounds, supply.unlock);
+      if (!loot) return true;
+      const message = loot.newlyOwned ? "Подобрано оружие · " + supply.weapon.name : "Боеприпасы · " + supply.weapon.name;
+      onNotice(loot.rounds > 0 ? message + " +" + loot.rounds : message);
+      supply.rounds -= loot.rounds;
+      supply.unlock = false;
+      return supply.rounds > 0;
+    });
+  }
+
   function update(elapsed, holding, pressed = false, sceneElapsed = elapsed) {
     state.time += elapsed;
     state.invulnerable = Math.max(0, state.invulnerable - elapsed);
@@ -346,6 +364,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
       }
       return false;
     }
+    collectNearbySupplies();
     if (state.robots.length) advanceRobots(elapsed);
     return false;
   }

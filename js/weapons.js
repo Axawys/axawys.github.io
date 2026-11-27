@@ -19,23 +19,40 @@ function wallDistance(x, y, dx, dy, range) {
 }
 
 export function createWeapons(state, player, burst, shock) {
-  const ammo = weapons.map(weapon => weapon.capacity);
-  let selected = weapons.length - 1;
+  const owned = weapons.map(weapon => weapon.id === "pistol");
+  const ammo = weapons.map((weapon, index) => owned[index] ? weapon.capacity : 0);
+  let selected = 0;
   let cooldown = 0;
 
   function refill() {
-    for (const [index, weapon] of weapons.entries()) ammo[index] = weapon.capacity;
+    for (const [index, weapon] of weapons.entries()) {
+      if (owned[index]) ammo[index] = weapon.capacity;
+    }
     cooldown = 0;
   }
 
+  function collect(index, rounds, unlock) {
+    const newlyOwned = Boolean(unlock && !owned[index]);
+    const gained = Math.min(rounds, weapons[index].capacity - ammo[index]);
+    if (!newlyOwned && gained <= 0) return null;
+    if (newlyOwned) owned[index] = true;
+    ammo[index] += gained;
+    return { newlyOwned, rounds: gained };
+  }
+
   function select(index) {
-    if (!state.armed || !Number.isInteger(index) || index < 0 || index >= weapons.length) return;
+    if (!state.armed || !Number.isInteger(index) || !owned[index]) return;
     selected = index;
   }
 
   function cycle(direction) {
-    if (!direction) return;
-    select((selected + Math.sign(direction) + weapons.length) % weapons.length);
+    if (!direction || !state.armed) return;
+    const step = Math.sign(direction);
+    let next = selected;
+    do {
+      next = (next + step + weapons.length) % weapons.length;
+    } while (!owned[next]);
+    select(next);
   }
 
   function hit(robot, damage, x, y) {
@@ -202,5 +219,5 @@ export function createWeapons(state, player, burst, shock) {
     cooldown = weapon.cooldown;
   }
 
-  return { ammo, cycle, refill, select, update, get equipped() { return weapons[selected]; } };
+  return { ammo, owned, collect, cycle, refill, select, update, get equipped() { return weapons[selected]; } };
 }
