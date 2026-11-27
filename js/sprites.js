@@ -81,15 +81,16 @@ export function drawRobot(ctx, robot, time) {
   }
 
   const small = robot.kind === "swarm";
-  const size = small ? 5 : 9;
-  const centerY = y - (small ? 4 : 8);
+  const agent = robot.kind === "agent";
+  const size = agent ? 13 : small ? 5 : 9;
+  const centerY = y - (size - 1);
   const metal = white ? "#faf9e3" : small ? "#b89a78" : "#b9aca2";
-  const eye = small ? "#f6a071" : "#ff7761";
+  const eye = agent ? robot.color : small ? "#f6a071" : "#ff7761";
   box(ctx, "#14231bd0", x - size - 4, y - 2, (size + 4) * 2, 4);
   for (const side of [-1, 1]) {
     for (let leg = 0; leg < 4; leg++) {
       const stride = Math.round(walk * (leg % 2 === 0 ? 3 : -3));
-      const tip = x + side * (size + 4 + (leg % 2) * 2);
+      const tip = x + side * (size + (agent ? 7 : 4) + (leg % 2) * 2);
       const joint = centerY + leg * (small ? 1 : 3) - size / 2;
       const foot = y + leg * 2 - 3 + stride;
       line(ctx, "#879b8b", x + side * (size - 2), joint, tip, joint - 4 + stride);
@@ -101,6 +102,34 @@ export function drawRobot(ctx, robot, time) {
   box(ctx, "#38443c", x - size + 2, centerY - size + 2, size * 2 - 4, small ? 3 : 7);
   box(ctx, eye, x - size + 4, centerY - size + (small ? 3 : 4), size * 2 - 8, small ? 1 : 2);
   box(ctx, "#769384", x - 2, centerY + 2, 4, 1);
+  if (agent) {
+    box(ctx, eye, x - size + 2, centerY + 4, 3, 3);
+    box(ctx, eye, x + size - 5, centerY + 4, 3, 3);
+  }
+}
+
+export function drawAgentNames(ctx, robots, livingPlayer) {
+  const tags = [];
+  const occupied = livingPlayer ? [{ x: livingPlayer.x, y: livingPlayer.y - 36, half: 17 }] : [];
+  for (const robot of robots) {
+    if (!robot.name) continue;
+    const x = Math.round(robot.x);
+    const anchor = Math.round(robot.y) - 27;
+    const half = Math.ceil((robot.name.length * 5 + 8) / 2);
+    let y = anchor - 14;
+    let overlap;
+    while ((overlap = occupied.find(tag => Math.abs(tag.x - x) < tag.half + half && Math.abs(tag.y - y) < 12))) {
+      y = overlap.y - 12;
+    }
+    const tag = { x, y, anchor, half, robot };
+    tags.push(tag);
+    occupied.push(tag);
+  }
+  for (const { x, y, anchor, robot } of tags) line(ctx, robot.color, x, y + 10, x, anchor);
+  for (const { x, y, half, robot } of tags) {
+    box(ctx, "#17251fe8", x - half, y, 2 * half, 11);
+    label(ctx, robot.name, x, y + 1, robot.color, 8);
+  }
 }
 
 export function drawVisitor(ctx, visitor, time, player) {

@@ -1,5 +1,5 @@
 import { box, label, pixels } from "./pixels.js";
-import { drawEffects, drawPlayer, drawRobot, drawVisitor, drawWeapon } from "./sprites.js";
+import { drawAgentNames, drawEffects, drawPlayer, drawRobot, drawVisitor, drawWeapon } from "./sprites.js";
 
 export const width = 980;
 export const height = 670;
@@ -172,6 +172,7 @@ export function createRenderer(canvas) {
     for (const layer of layers.sort((a, b) => a.depth - b.depth)) layer.draw(context, time * 1000);
     if (action.armed) drawWeapon(context, player, action.aim, true);
     drawEffects(context, action, time);
+    drawAgentNames(context, action.robots, action.dead ? null : player);
     context.restore();
   }
   return { camera, follow, worldPoint, screenPoint, draw };

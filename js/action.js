@@ -6,6 +6,23 @@ const robotTypes = {
   spider: { radius: 5, hitRadius: 10, eye: 8, hp: 65, speed: 88, damage: 24, color: "#ff947a" },
   walker: { radius: 6, hitRadius: 15, eye: 21, hp: 120, speed: 70, damage: 38, color: "#f6c786" },
   swarm: { radius: 3, hitRadius: 6, eye: 4, hp: 20, speed: 87, damage: 12, color: "#e6ac76" },
+  agent: { radius: 6, hitRadius: 15, eye: 13, hp: 92, speed: 74, damage: 25 },
+};
+
+const swarmMembers = [
+  { kind: "agent", name: "Claude Code", color: "#f3ae91", dx: -47, dy: 43 },
+  { kind: "agent", name: "Codex", color: "#c3acf5", dx: 0, dy: 48 },
+  { kind: "agent", name: "Cursor", color: "#8adad1", dx: 47, dy: 43 },
+  ...Array.from({ length: 7 }, (_, index) => ({
+    kind: "swarm", dx: (index - 3) * 13, dy: 59 + index % 2 * 11,
+  })),
+];
+
+const eventText = {
+  spider: "Canonical негодует",
+  walker: "Вы потревожили РКН",
+  swarm: "На вас напали ИИ-агенты",
+  visitor: "Линус Торвальдс прошёл мимо. Ядро в порядке.",
 };
 
 function nearFree(x, y, radius) {
@@ -20,7 +37,7 @@ function nearFree(x, y, radius) {
   return null;
 }
 
-export function createAction() {
+export function createAction(onNotice = () => {}) {
   const state = {
     time: 0, aim: { x: player.x, y: player.y - 48, visible: false },
     robots: [], particles: [], shocks: [], shots: [], pending: [], visitor: null,
@@ -130,18 +147,19 @@ export function createAction() {
       return;
     }
 
-    const kind = robotTypes[event];
-    const count = event === "swarm" ? 8 : 1;
-    for (let index = 0; index < count; index++) {
-      const offset = (index - (count - 1) / 2) * 11;
-      const point = nearFree(x + offset, y + 44 + index % 3 * 8, kind.radius);
+    const members = event === "swarm" ? swarmMembers : [{ kind: event, dx: 0, dy: 44 }];
+    for (const [index, { kind, dx, dy, ...identity }] of members.entries()) {
+      const type = robotTypes[kind];
+      const point = nearFree(x + dx, y + dy, type.radius);
       if (!point) continue;
-      const speed = kind.speed + (count > 1 ? (index % 4) * 4 - 6 : 0);
-      state.robots.push({ ...kind, ...point, kind: event, speed, stride: 0, flash: 0, ready: state.time + 0.45 });
+      const speed = type.speed + (kind === "swarm" ? (index % 4) * 4 - 6 : 0);
+      state.robots.push({ ...type, ...identity, ...point, kind, speed, stride: 0, flash: 0, ready: state.time + 0.45 });
     }
-    shock(x, y + 16, 43, kind.color, 0.35);
-    burst(x, y + 5, [kind.color, "#efcd9d", "#8c6b5d"], count * 5 + 20, 116);
+    const color = robotTypes[event].color;
+    shock(x, y + 16, 43, color, 0.35);
+    burst(x, y + 5, [color, "#efcd9d", "#8c6b5d"], members.length * 5 + 20, 116);
     state.shake = Math.max(0.27, state.shake);
+    onNotice(eventText[event], true);
   }
 
   function advanceVisitor(elapsed) {
@@ -159,6 +177,7 @@ export function createAction() {
           visitor.target = door;
           visitor.field = doorField;
           visitor.labelUntil = state.time + 2.5;
+          onNotice(eventText.visitor);
         } else {
           visitor.x = door.x;
           visitor.phase = "exit";

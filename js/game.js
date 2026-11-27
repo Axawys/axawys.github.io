@@ -13,6 +13,8 @@ const noteList = byId("tasks");
 const hintPanel = byId("station-hint");
 const health = byId("health");
 const death = byId("death");
+const eventNotices = byId("event-notices");
+const activeNotices = [];
 const note = noteSpots[Math.floor(Math.random() * noteSpots.length)];
 const systems = shuffleSystems();
 const notes = [note, ...stations.map((station, index) => ({
@@ -24,11 +26,19 @@ const notes = [note, ...stations.map((station, index) => ({
 }))];
 
 const renderer = createRenderer(canvas);
-const action = createAction();
+const action = createAction(showNotice);
 const terminal = createTerminal(stations, systems, (task, station) => {
   taskRows.get(task).classList.add("done");
   action.trigger(task.event, station, renderer.camera);
 });
+
+function showNotice(message, warning = false) {
+  const element = document.createElement("p");
+  element.textContent = message;
+  element.classList.toggle("warning", warning);
+  eventNotices.append(element);
+  activeNotices.push({ element, expires: action.state.time + 4.5 });
+}
 
 function commandSequence(task) {
   const instruction = document.createDocumentFragment();
@@ -228,6 +238,7 @@ function frame(time) {
   updateInteraction(paused);
   if (health.value !== String(player.hp)) health.value = String(player.hp);
   if (death.hidden === action.state.dead) death.hidden = !action.state.dead;
+  while (activeNotices[0]?.expires <= action.state.time) activeNotices.shift().element.remove();
   canvas.classList.toggle("armed", action.state.armed);
   renderer.draw({ nearby, visited: terminal.visited, notes, action: action.state, time: action.state.time });
   requestAnimationFrame(frame);
