@@ -1,12 +1,12 @@
 import { gunRay } from "./pixels.js";
 import { isWalkable } from "./room.js";
 
-const weapons = [
-  { kind: "bullet", name: "Пистолет", length: 8, thickness: 2, color: "#d8d6bd", range: 430, damage: 38, cooldown: 0.26 },
-  { kind: "rocket", name: "Гранатомёт", length: 18, thickness: 5, color: "#d7a67d", range: 320, radius: 44, damage: 108, cooldown: 0.7 },
-  { kind: "grenade", name: "Гранаты", length: 7, color: "#aaca88", range: 155, radius: 55, damage: 128, cooldown: 0.78 },
-  { kind: "flame", name: "Огнемёт", length: 15, thickness: 4, color: "#f9b06e", range: 96, damage: 12, cooldown: 0.09, automatic: true },
-  { kind: "bullet", name: "Автомат", length: 13, thickness: 3, color: "#a8b7a5", range: 560, damage: 24, cooldown: 0.105, automatic: true },
+export const weapons = [
+  { id: "pistol", kind: "bullet", name: "Пистолет", length: 8, thickness: 2, color: "#d8d6bd", range: 430, damage: 38, cooldown: 0.26 },
+  { id: "launcher", kind: "rocket", name: "Гранатомёт", length: 18, thickness: 5, color: "#d7a67d", range: 320, radius: 44, damage: 108, cooldown: 0.7 },
+  { id: "grenade", kind: "grenade", name: "Гранаты", length: 7, color: "#aaca88", range: 155, radius: 55, damage: 128, cooldown: 0.78 },
+  { id: "flame", kind: "flame", name: "Огнемёт", length: 15, thickness: 4, color: "#f9b06e", range: 96, damage: 12, cooldown: 0.09, automatic: true },
+  { id: "rifle", kind: "bullet", name: "Автомат", length: 13, thickness: 3, color: "#a8b7a5", range: 560, damage: 24, cooldown: 0.105, automatic: true },
 ];
 
 function wallDistance(x, y, dx, dy, range) {
@@ -22,9 +22,14 @@ export function createWeapons(state, player, burst, shock) {
   let selected = weapons.length - 1;
   let cooldown = 0;
 
+  function select(index) {
+    if (!state.armed || !Number.isInteger(index) || index < 0 || index >= weapons.length) return;
+    selected = index;
+  }
+
   function cycle(direction) {
-    if (!state.armed || !direction) return;
-    selected = (selected + Math.sign(direction) + weapons.length) % weapons.length;
+    if (!direction) return;
+    select((selected + Math.sign(direction) + weapons.length) % weapons.length);
   }
 
   function hit(robot, damage, x, y) {
@@ -190,5 +195,5 @@ export function createWeapons(state, player, burst, shock) {
     cooldown = weapon.cooldown;
   }
 
-  return { cycle, update, get equipped() { return weapons[selected]; } };
+  return { cycle, select, update, get equipped() { return weapons[selected]; } };
 }

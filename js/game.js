@@ -1,8 +1,10 @@
 import { createAction } from "./action.js";
 import { createRenderer, movePlayer, nearestInteraction, noteSpots, player, stations } from "./room.js";
+import { drawWeaponIcon } from "./sprites.js";
 import { shuffleSystems } from "./systems.js";
 import { tasks } from "./tasks.js";
 import { createTerminal } from "./terminal.js";
+import { weapons } from "./weapons.js";
 
 const byId = id => document.getElementById(id);
 const canvas = byId("room");
@@ -13,6 +15,7 @@ const noteList = byId("tasks");
 const hintPanel = byId("station-hint");
 const health = byId("health");
 const death = byId("death");
+const weaponSlots = byId("weapon-slots");
 const eventNotices = byId("event-notices");
 const activeNotices = [];
 const note = noteSpots[Math.floor(Math.random() * noteSpots.length)];
@@ -31,6 +34,41 @@ const terminal = createTerminal(stations, systems, (task, station) => {
   taskRows.get(task).classList.add("done");
   action.trigger(task.event, station, renderer.camera);
 });
+
+const slotButtons = weapons.map((weapon, index) => {
+  const slot = document.createElement("button");
+  const key = document.createElement("kbd");
+  const icon = document.createElement("canvas");
+  const name = document.createElement("span");
+  const number = String(index + 1);
+  slot.className = "weapon-slot";
+  slot.type = "button";
+  slot.setAttribute("aria-pressed", "false");
+  slot.setAttribute("aria-keyshortcuts", number);
+  key.setAttribute("aria-hidden", "true");
+  key.textContent = number;
+  icon.className = "weapon-slot-icon";
+  icon.width = 22;
+  icon.height = 12;
+  icon.setAttribute("aria-hidden", "true");
+  drawWeaponIcon(icon.getContext("2d"), weapon);
+  name.textContent = weapon.name;
+  slot.append(key, icon, name);
+  slot.addEventListener("click", () => action.selectWeapon(index));
+  weaponSlots.append(slot);
+  return slot;
+});
+let shownWeapon;
+
+function updateWeaponSlots() {
+  const { armed, weapon } = action.state;
+  if (weaponSlots.hidden === armed) weaponSlots.hidden = !armed;
+  if (!armed || weapon === shownWeapon) return;
+  shownWeapon = weapon;
+  for (const [index, slot] of slotButtons.entries()) {
+    slot.setAttribute("aria-pressed", String(weapons[index] === weapon));
+  }
+}
 
 function showNotice(message, warning = false) {
   const element = document.createElement("p");
@@ -144,6 +182,12 @@ window.addEventListener("keydown", event => {
     return;
   }
   if (noteDialog.open || action.state.dead || event.altKey || event.ctrlKey || event.metaKey) return;
+  const weaponKey = /^(?:Digit|Numpad)([1-5])$/.exec(event.code);
+  if (weaponKey && action.state.armed) {
+    event.preventDefault();
+    action.selectWeapon(Number(weaponKey[1]) - 1);
+    return;
+  }
   if (movement.has(event.code)) {
     event.preventDefault();
     keys.add(event.code);
@@ -250,6 +294,7 @@ function frame(time) {
   if (death.hidden === action.state.dead) death.hidden = !action.state.dead;
   while (activeNotices[0]?.expires <= action.state.time) activeNotices.shift().element.remove();
   canvas.classList.toggle("armed", action.state.armed);
+  updateWeaponSlots();
   renderer.draw({ nearby, visited: terminal.visited, notes, action: action.state, time: action.state.time });
   requestAnimationFrame(frame);
 }

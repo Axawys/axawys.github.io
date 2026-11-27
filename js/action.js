@@ -267,5 +267,5 @@ export function createAction(onNotice = () => {}) {
     return false;
   }
 
-  return { state, trigger, update, cycleWeapon: arsenal.cycle };
+  return { state, trigger, update, cycleWeapon: arsenal.cycle, selectWeapon: arsenal.select };
 }

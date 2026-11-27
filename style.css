@@ -17,7 +17,7 @@ ul { list-style: none; padding: 0; }
 code, kbd { font-family: var(--mono); }
 kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 25px; min-height: 24px; padding: 1px 6px; color: #c7dcd0; background: #101913; border: 1px solid #35493d; border-bottom-width: 2px; font-size: .75rem; white-space: nowrap; }
 
-.game { position: fixed; inset: 0; overflow: hidden; background: #121c18; }
+.game { --hud-bottom: max(24px, env(safe-area-inset-bottom)); --slot-height: 68px; position: fixed; inset: 0; overflow: hidden; background: #121c18; }
 #room { display: block; width: 100%; height: 100%; outline: none; image-rendering: pixelated; touch-action: none; }
 #room.armed { cursor: crosshair; }
 .interact { position: absolute; z-index: 1; transform: translate(-50%, -100%); display: flex; align-items: center; gap: 7px; min-height: 32px; padding: 4px 8px; border: 1px solid #92bb97; background: #162a20; color: #d8f1d9; box-shadow: 0 3px #0b1710a8; white-space: nowrap; font: 700 .8rem var(--mono); }
@@ -27,7 +27,16 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .touch-controls { display: none; }
 #death { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; color: #ffe5d6; background: radial-gradient(ellipse at center, transparent 25%, #5c1d265c); text-shadow: 2px 3px #3c1d21; font: 700 clamp(1.4rem, 4vw, 2.2rem) var(--mono); }
-.event-notices { position: absolute; inset: auto 12px max(24px, env(safe-area-inset-bottom)); z-index: 2; display: grid; justify-items: center; gap: 6px; pointer-events: none; }
+.weapon-slots { position: absolute; inset: auto 0 var(--hud-bottom); z-index: 3; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; width: min(452px, calc(100% - 20px)); height: var(--slot-height); margin-inline: auto; }
+.weapon-slot { position: relative; display: grid; justify-items: center; align-content: end; gap: 3px; min-width: 0; padding: 5px 1px 7px; border: 1px solid #557364; background: #162820f5; color: #d7e5da; box-shadow: 0 3px #0c1712a8, inset 0 -3px #102018; font-size: clamp(.6rem, 2.8vw, .78rem); font-weight: 700; white-space: nowrap; }
+.weapon-slot:hover { background: #294538; border-color: #92b09b; }
+.weapon-slot[aria-pressed="true"] { border-color: #a4edb6; color: #eefff2; background: #2d4f3b; box-shadow: 0 3px #0c1712a8, inset 0 -3px #9ee5aa; }
+.weapon-slot kbd { position: absolute; inset: 4px auto auto 5px; min-width: 17px; min-height: 17px; padding: 0 3px; font-size: .64rem; }
+.weapon-slot[aria-pressed="true"] kbd { border-color: #80bd8d; color: #e6ffe9; }
+.weapon-slot-icon { display: block; width: 44px; height: 24px; image-rendering: pixelated; }
+.weapon-slot span { max-width: 100%; overflow-wrap: anywhere; text-align: center; white-space: normal; line-height: 1.1; }
+.event-notices { position: absolute; inset: auto 12px var(--hud-bottom); z-index: 2; display: grid; justify-items: center; gap: 6px; pointer-events: none; }
+.weapon-slots:not([hidden]) ~ .event-notices { bottom: calc(var(--hud-bottom) + var(--slot-height) + 9px); }
 .event-notices p { padding: 10px 14px; border: 1px solid #648774; border-inline-start: 4px solid #98d8b5; color: #e1f3e6; background: #172a22f5; box-shadow: 0 3px #0d1712b8; text-align: center; font: 700 clamp(.8rem, 2.7vw, .95rem)/1.35 var(--mono); }
 .event-notices .warning { border-color: #aa7755; border-inline-start-color: #f5ad79; color: #ffdfc2; background: #31231cf5; }
 @media (prefers-reduced-motion: no-preference) {
@@ -93,10 +102,12 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 
 @media (max-width: 330px) {
   .terminal-result { flex-direction: column; }
+  .weapon-slots { width: calc(100% - 12px); gap: 3px; }
+  .weapon-slot span { letter-spacing: -.015em; }
 }
 
 @media (pointer: coarse) {
-  .event-notices { bottom: max(108px, calc(env(safe-area-inset-bottom) + 96px)); }
+  .game { --hud-bottom: max(108px, calc(env(safe-area-inset-bottom) + 96px)); }
   .touch-controls { position: absolute; bottom: max(12px, env(safe-area-inset-bottom)); left: max(12px, env(safe-area-inset-left)); display: grid; grid-template-columns: repeat(3, 46px); grid-template-rows: repeat(2, 40px); justify-content: center; gap: 3px; touch-action: none; }
   .touch-controls button { color: var(--accent); background: #23372b; border: 1px solid #4a6c56; box-shadow: inset 0 -3px #15271d; font: 700 1.1rem var(--mono); user-select: none; touch-action: none; }
   .touch-controls button:first-child { grid-column: 2; }

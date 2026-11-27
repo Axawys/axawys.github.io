@@ -15,6 +15,78 @@ const healthGlyphs = {
   H: ["10001", "10001", "10001", "11111", "10001", "10001", "10001"],
   P: ["11110", "10001", "10001", "11110", "10000", "10000", "10000"],
 };
+const weaponIcons = {
+  pistol: [
+    "....................",
+    "....................",
+    "....oooooo..........",
+    "...o++++++oooooo....",
+    "...oxxxxxxxxxxxo....",
+    "....oooxxxxoooo.....",
+    "......oxxoo.........",
+    ".....oxxo...........",
+    ".....oxxo...........",
+    ".....oooo...........",
+  ],
+  launcher: [
+    "....................",
+    ".....oooo.......oo..",
+    "..oooxxxoooooooooxo.",
+    ".ox++++++++++++++++o",
+    ".oxxxxxxxxxxxxxxxxxo",
+    "..oooooxxxxxooooooo.",
+    "......oxooxo........",
+    ".....oxxo.oxo.......",
+    ".....oooo..oo.......",
+    "....................",
+  ],
+  grenade: [
+    "..........ooo.......",
+    "........ooo+oo......",
+    ".......o++o.oo......",
+    "......oxxxxo........",
+    ".....o++++xxo.......",
+    ".....oxxxoxxo.......",
+    ".....ooxooxxo.......",
+    ".....oxxxoxxo.......",
+    "......oxxxoo........",
+    ".......oooo.........",
+  ],
+  flame: [
+    "....................",
+    ".....oooo...........",
+    "....o++++o......o...",
+    "..oooxxxxo...ooo+o..",
+    ".ox+xxxxxxoooxx++xo.",
+    ".oxxxxxxxxxxxxxxooo.",
+    "..ooooxxooooxooo....",
+    ".....oxxo..oo.......",
+    ".....oooo...........",
+    "....................",
+  ],
+  rifle: [
+    "....................",
+    "........ooo.........",
+    "....oooo+++oooooo...",
+    ".oooo+++++++++oo+oo.",
+    ".oxxxxxxxxxxxxxxxxxo",
+    ".oxoooxxxxxxooooooo.",
+    "..oo..oxooxo........",
+    ".....oxxo.oxo.......",
+    ".....oooo..oxo......",
+    "............oo......",
+  ],
+};
+
+export function drawWeaponIcon(ctx, weapon) {
+  const palette = { o: "#0b1811", x: weapon.color, "+": "#f0e8cd" };
+  for (const [y, row] of weaponIcons[weapon.id].entries()) {
+    for (let x = 0; x < row.length; x++) {
+      const color = palette[row[x]];
+      if (color) box(ctx, color, x + 1, y + 1, 1, 1);
+    }
+  }
+}
 
 function playerStatus(player, weapon) {
   const height = weapon ? 27 : 16;
