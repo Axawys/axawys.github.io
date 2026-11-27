@@ -1,7 +1,7 @@
 import { label, textWidth } from "./pixel-font.js";
 import { box, gunRay, line, pixels } from "./pixels.js";
 
-const robotTopOffset = { swarm: 10, spider: 17, agent: 26, walker: 33, furry: 36 };
+const robotTopOffset = { swarm: 10, spider: 17, agent: 26, walker: 33, furry: 36, homingRocket: 7 };
 const weaponIcons = {
   pistol: [
     "....................",
@@ -408,8 +408,8 @@ function findTagPosition(occupied, view, anchorX, anchorY, feetY, half, height, 
   return findSpareTagPosition(occupied, view, center, above, half, height);
 }
 
-export function drawRobotTags(ctx, robots, livingPlayer, camera, weapon = null, allies = []) {
-  if (!robots.length && !allies.length) return;
+export function drawRobotTags(ctx, robots, livingPlayer, camera, weapon = null, allies = [], rockets = []) {
+  if (!robots.length && !allies.length && !rockets.length) return;
   const left = Math.round(camera.x);
   const top = Math.round(camera.y);
   const view = { left: left + 3, right: left + camera.w - 3, top: top + 3, bottom: top + camera.h - 3 };
@@ -417,7 +417,7 @@ export function drawRobotTags(ctx, robots, livingPlayer, camera, weapon = null, 
   const visible = [];
   const tagHeight = 23;
   const occupied = livingPlayer ? [playerStatus(livingPlayer, weapon)] : [];
-  for (const robot of allies.length ? [...allies, ...robots] : robots) {
+  for (const robot of [...allies, ...robots, ...rockets]) {
     if (robot.x < left - 12 || robot.x > view.right + 15 || robot.y < top || robot.y > view.bottom + 33) continue;
     const anchorX = Math.round(robot.x);
     const feetY = Math.round(robot.y);
@@ -618,6 +618,16 @@ export function drawEffects(ctx, action, time) {
       pixels(ctx, "#718650", x - 2, y - projectile.lift - 2, 5);
       pixels(ctx, projectile.lift < 1 && Math.floor(time * 16) % 2 ? "#ff9159" : "#d2d793", x, y - projectile.lift - 2, 2);
     }
+  }
+  for (const { x, y, dx, dy } of action.hostileBullets) {
+    line(ctx, "#ff8b59", x - dx * 8, y - dy * 8, x, y, 2);
+    pixels(ctx, "#ffe39c", x, y, 2);
+  }
+  for (const { x, y, dx, dy, flash } of action.hostileRockets) {
+    line(ctx, "#ee77668c", x - dx * 19, y - dy * 19, x, y, 3);
+    line(ctx, "#68312d", x - dx * 6, y - dy * 6, x + dx * 5, y + dy * 5, 6);
+    line(ctx, time < flash ? "#fff1d1" : "#ff9e8a", x - dx * 5, y - dy * 5, x + dx * 4, y + dy * 4, 3);
+    pixels(ctx, "#fff0ad", x + dx * 5, y + dy * 5, 2);
   }
   for (const shot of action.shots) {
     ctx.globalAlpha = Math.min(1, shot.life * 13);

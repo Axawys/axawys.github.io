@@ -1,4 +1,5 @@
 import { door, height, isWalkable, moveBody, player, playerStart, supplySpots, width } from "./room.js";
+import { createHostileFire } from "./hostile-fire.js";
 import { clearPath, makeField, nearestCell, pursue } from "./navigation.js";
 import { createWeapons, weapons } from "./weapons.js";
 
@@ -59,6 +60,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
   const state = {
     time: 0, aim: { x: player.x, y: player.y - 48, visible: false },
     robots: [], particles: [], shocks: [], shots: [], projectiles: [], pending: [], visitor: null, allies: [],
+    hostileBullets: [], hostileRockets: [],
     supplies: supplySpots.map(spot => {
       if (!spot.weaponId) return { ...spot };
       const index = weapons.findIndex(weapon => weapon.id === spot.weaponId);
@@ -72,6 +74,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
   };
   let reviveIn = 0;
   const arsenal = createWeapons(state, player, burst, shock, damageAlly);
+  const hostileFire = createHostileFire(state, player, hitPlayer, burst, shock);
   let playerCell = -1;
   let playerField;
   const queuedVisitors = [];
@@ -128,6 +131,8 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     }
     Object.assign(player, point ?? playerStart, { hp: player.maxHp, armor: 0, moving: false, facing: "north" });
     arsenal.refill();
+    state.hostileBullets.length = 0;
+    state.hostileRockets.length = 0;
     state.dead = false;
     state.invulnerable = 1.25;
     state.shake = 0;
@@ -202,6 +207,9 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
         if (Math.hypot(robot.x - blast.x, robot.y - blast.y) <= blast.radius) {
           arsenal.damageRobot(robot, gentooMobDamage, robot.x, robot.y - robot.eye);
         }
+      }
+      for (const rocket of [...state.hostileRockets]) {
+        if (Math.hypot(rocket.x - blast.x, rocket.y + 9 - blast.y) <= blast.radius) arsenal.damageRocket(rocket, gentooMobDamage);
       }
       for (const ally of [...state.allies]) {
         if (Math.hypot(ally.x - blast.x, ally.y - blast.y) <= blast.radius) damageAlly(ally, gentooMobDamage);
@@ -383,6 +391,8 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     for (const robot of state.robots) {
       if (robot.reviveAt || state.time < robot.ready) continue;
       const gap = Math.hypot(player.x - robot.x, player.y - robot.y);
+      const ranged = robot.phase === 2;
+      const clear = ranged && hostileFire.fire(robot, gap);
       const interception = interceptingAlly(robot, gap);
       if (interception) {
         const { ally, gap: allyGap } = interception;
@@ -395,7 +405,15 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
         }
         continue;
       }
+      if (clear && gap <= 138) {
+        if (gap > 0 && gap < 87) {
+          const travel = Math.min(robot.speed * elapsed, 87 - gap) / gap;
+          if (moveBody(robot, (robot.x - player.x) * travel, (robot.y - player.y) * travel)) robot.stride += elapsed * 13;
+        }
+        continue;
+      }
       if (gap < robot.radius + player.radius + 1) {
+        if (ranged) continue;
         if (robot.kind === "furry" && !state.invulnerable) {
           robot.attackUntil = state.time + 0.19;
           robot.attackSide = player.x < robot.x ? -1 : 1;
@@ -434,6 +452,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
       robot.maxHp *= 2;
       robot.hp = robot.maxHp;
       robot.flash = state.time + 0.18;
+      hostileFire.arm(robot);
       burst(robot.x, robot.y - robot.eye, ["#ff967a", "#fff3c8"], 18, 75);
       shock(robot.x, robot.y, 30, "#ffae81", 0.35);
       onNotice(robot.name + " · фаза 2", true);
@@ -520,6 +539,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     advanceVisitor(elapsed);
     for (const ally of [...state.allies]) advanceAlly(ally, elapsed, sceneElapsed);
     arsenal.update(elapsed, holding, pressed);
+    hostileFire.update(elapsed);
     advanceCelebration(sceneElapsed);
 
     if (state.dead) {

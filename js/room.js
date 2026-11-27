@@ -235,7 +235,7 @@ export function createRenderer(canvas) {
     for (const layer of layers.sort((a, b) => a.depth - b.depth)) layer.draw(context, time * 1000);
     if (weapon) drawWeapon(context, player, action.aim, weapon, true);
     drawEffects(context, action, time);
-    drawRobotTags(context, action.robots, action.dead ? null : player, camera, weapon, action.allies);
+    drawRobotTags(context, action.robots, action.dead ? null : player, camera, weapon, action.allies, action.hostileRockets);
     context.restore();
   }
   return { camera, follow, worldPoint, screenPoint, draw };
