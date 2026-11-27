@@ -1,6 +1,6 @@
 import { box, gunRay, label, line, pixels } from "./pixels.js";
 
-const robotTopOffset = { swarm: 10, spider: 17, agent: 26, walker: 33 };
+const robotTopOffset = { swarm: 10, spider: 17, agent: 26, walker: 33, furry: 36 };
 const healthGlyphs = {
   0: ["01110", "10001", "10001", "10001", "10001", "10001", "01110"],
   1: ["00100", "01100", "00100", "00100", "00100", "00100", "01110"],
@@ -183,7 +183,64 @@ export function drawWeapon(ctx, player, aim, weapon, laser) {
   pixels(ctx, "#e44948", muzzleX, muzzleY, 2);
 }
 
+function drawFurry(ctx, robot, time) {
+  const x = Math.round(robot.x);
+  const y = Math.round(robot.y);
+  const step = Math.round(Math.sin(robot.stride * 1.45) * 2);
+  const tail = Math.round(Math.sin(robot.stride * 0.85) * 3);
+  const outline = "#293446";
+  const fur = time < robot.flash ? "#f1effb" : "#7f9dcf";
+  const fluff = "#dbe4f5";
+
+  box(ctx, "#14231bd0", x - 9, y - 1, 21, 4);
+  box(ctx, outline, x + 5, y - 11 + tail, 11, 7);
+  box(ctx, outline, x + 11, y - 18 + tail, 10, 11);
+  box(ctx, "#6884b3", x + 9, y - 10 + tail, 8, 4);
+  box(ctx, fur, x + 12, y - 17 + tail, 8, 9);
+  box(ctx, fluff, x + 17, y - 17 + tail, 3, 5);
+  box(ctx, fluff, x + 15, y - 17 + tail, 2, 3);
+
+  for (const side of [-1, 1]) {
+    const leg = x + side * 5 - 2;
+    box(ctx, outline, leg - 1, y - 9 + side * step, 6, 8);
+    box(ctx, "#627dab", leg, y - 8 + side * step, 4, 6);
+    box(ctx, fluff, leg, y - 3 + side * step, 4, 2);
+  }
+  box(ctx, outline, x - 9, y - 19, 18, 13);
+  box(ctx, fur, x - 7, y - 18, 14, 11);
+  box(ctx, fluff, x - 3, y - 16, 6, 7);
+  box(ctx, "#627dab", x - 10, y - 17 - step, 4, 8);
+  box(ctx, "#627dab", x + 6, y - 17 + step, 4, 8);
+  box(ctx, "#f7ae79", x - 7, y - 19, 14, 3);
+  box(ctx, "#b86c5d", x + 4, y - 16, 3, 4);
+
+  for (const side of [-1, 1]) {
+    const ear = x + side * 7 - 2;
+    box(ctx, outline, ear, y - 36, 5, 10);
+    box(ctx, fur, ear + 1, y - 34, 3, 8);
+    box(ctx, "#c78eae", ear + 2, y - 31, 2, 5);
+  }
+  box(ctx, outline, x - 9, y - 30, 18, 13);
+  box(ctx, fur, x - 8, y - 29, 16, 10);
+  box(ctx, fluff, x - 9, y - 23, 5, 4);
+  box(ctx, fluff, x + 4, y - 23, 5, 4);
+  box(ctx, fluff, x - 4, y - 22, 8, 5);
+  box(ctx, outline, x - 6, y - 26, 4, 2);
+  box(ctx, outline, x + 2, y - 26, 4, 2);
+  box(ctx, "#ffcc88", x - 5, y - 25, 2, 1);
+  box(ctx, "#ffcc88", x + 3, y - 25, 2, 1);
+  box(ctx, outline, x - 2, y - 22, 4, 2);
+  if (time < robot.attackUntil) {
+    for (const offset of [0, 4, 8]) line(ctx, "#f6d9ac", x - 16 + offset, y - 14, x - 12 + offset, y - 20);
+  }
+}
+
 export function drawRobot(ctx, robot, time) {
+  if (robot.kind === "furry") {
+    drawFurry(ctx, robot, time);
+    return;
+  }
+
   const x = Math.round(robot.x);
   const y = Math.round(robot.y);
   const walk = Math.sin(robot.stride * 1.2);

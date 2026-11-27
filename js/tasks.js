@@ -4,4 +4,5 @@ export const tasks = [
   { system: "ALT Linux", title: "Установить VPN на ALT Linux", command: "apt-get install vpn", setup: "su -", event: "walker" },
   { system: "Fedora", title: "Обновить Fedora", command: "sudo dnf upgrade", event: "visitor" },
   { system: "Omarchy", title: "Удалить систему Omarchy", command: "sudo rm -rf /", event: "swarm" },
+  { system: "NixOS", title: "Удалить хранилище NixOS", command: "sudo rm -rf /nix/store", event: "furry" },
 ];

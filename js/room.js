@@ -12,6 +12,7 @@ export const stations = [
   { number: 3, x: 804, y: 133, screen: "#83bedc", hintSide: -1 },
   { number: 4, x: 152, y: 418, screen: "#91d7ad", hintSide: 1 },
   { number: 5, x: 813, y: 410, screen: "#e0bd84", hintSide: -1 },
+  { number: 6, x: 620, y: 261, screen: "#8faadd", hintSide: 1 },
 ];
 
 export const player = { x: 490, y: 471, facing: "north", moving: false, stride: 0, hp: 100, radius: 4 };
@@ -229,6 +230,7 @@ function drawOffice(ctx) {
     [740, 93, 205, 106, "#47667842", "#608a9d88"],
     [46, 367, 226, 167, "#5c6d463f", "#81895680"],
     [744, 369, 212, 163, "#66594245", "#927e5585"],
+    [558, 233, 131, 110, "#4e647b42", "#6c8ca684"],
     [301, 419, 510, 112, "#5c665125", "#7b85604d"],
   ]) drawZone(ctx, x, y, w, h, shade, trim);
 
@@ -242,12 +244,13 @@ function drawOffice(ctx) {
   }
   for (const [x, y, text] of [
     [156, 220, "01 / QA"], [466, 208, "02 / DEVELOPMENT"], [820, 220, "03 / NETWORK"],
-    [158, 547, "04 / BUILD"], [827, 547, "05 / OPERATIONS"], [490, 388, "BREAK AREA"], [490, 609, "EXIT"],
+    [158, 547, "04 / BUILD"], [827, 547, "05 / OPERATIONS"], [620, 351, "06 / PACKAGES"],
+    [490, 388, "BREAK AREA"], [490, 609, "EXIT"],
   ]) label(ctx, text, x, y, "#b4c8a993", 9);
 
   for (const [x, y, shade] of [
     [152, 118, "#89d0a532"], [459, 113, "#b2a7e02b"], [815, 141, "#87bdcf35"],
-    [152, 418, "#88bc7930"], [813, 410, "#e4c58630"], [490, 453, "#d7d5a740"],
+    [152, 418, "#88bc7930"], [813, 410, "#e4c58630"], [620, 261, "#8db9ed32"], [490, 453, "#d7d5a740"],
     [490, 635, "#bdcda22b"],
   ]) {
     const glow = ctx.createRadialGradient(x, y, 1, x, y, 104);

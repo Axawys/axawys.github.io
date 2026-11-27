@@ -7,6 +7,7 @@ const robotTypes = {
   walker: { name: "Робот ALT Linux", radius: 6, hitRadius: 15, eye: 21, maxHp: 192, speed: 70, damage: 38, color: "#f6c786" },
   swarm: { name: "ИИ-агент", radius: 3, hitRadius: 6, eye: 4, maxHp: 44, speed: 87, damage: 12, color: "#e6ac76" },
   agent: { radius: 6, hitRadius: 15, eye: 13, maxHp: 144, speed: 74, damage: 25 },
+  furry: { name: "Фурри", radius: 6, hitRadius: 13, eye: 17, maxHp: 156, speed: 98, damage: 28, color: "#a8c8ff" },
 };
 
 const gentooOverheat = 2;
@@ -25,6 +26,7 @@ const eventText = {
   spider: "Canonical негодует",
   walker: "Вы потревожили РКН",
   swarm: "На вас напали ИИ-агенты",
+  furry: "Пушистая ярость",
   visitor: "Линус Торвальдс прошёл мимо. Ядро в порядке.",
 };
 
@@ -155,7 +157,8 @@ export function createAction(onNotice = () => {}) {
       return;
     }
 
-    const members = event === "swarm" ? swarmMembers : [{ kind: event, dx: 0, dy: 44 }];
+    const frontOffset = event === "furry" ? (player.x < x ? 25 : -25) : 0;
+    const members = event === "swarm" ? swarmMembers : [{ kind: event, dx: frontOffset, dy: 44 }];
     for (const [index, { kind, dx, dy, ...identity }] of members.entries()) {
       const type = robotTypes[kind];
       const point = nearFree(x + dx, y + dy, type.radius);
@@ -206,6 +209,7 @@ export function createAction(onNotice = () => {}) {
       if (state.time < robot.ready) continue;
       const gap = Math.hypot(player.x - robot.x, player.y - robot.y);
       if (gap < robot.radius + player.radius + 1) {
+        if (robot.kind === "furry" && !state.invulnerable && !state.dead) robot.attackUntil = state.time + 0.19;
         hitPlayer(robot.damage);
         continue;
       }
