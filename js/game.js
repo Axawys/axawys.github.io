@@ -173,13 +173,18 @@ function updateInteraction(paused) {
     nearby = target;
     interactButton.hidden = !target;
     interactText.textContent = target?.task ? "Читать подсказку" : target === note ? "Читать записку" : "Сесть за ПК";
+    interactButton.classList.toggle("below", target?.kind === "note");
   }
   if (!target) return;
 
-  const point = renderer.screenPoint(target.x, target.y - (target.kind === "note" ? 37 : 20));
+  const below = target.kind === "note";
+  const point = renderer.screenPoint(target.x, target.y + (below ? 8 : -32));
   const half = interactButton.offsetWidth / 2 + 5;
+  const buttonHeight = interactButton.offsetHeight;
+  const minY = below ? 5 : buttonHeight + 5;
+  const maxY = canvas.clientHeight - (below ? buttonHeight : 0) - 5;
   interactButton.style.left = Math.max(half, Math.min(canvas.clientWidth - half, point.x)) + "px";
-  interactButton.style.top = Math.max(interactButton.offsetHeight + 5, point.y) + "px";
+  interactButton.style.top = Math.max(minY, Math.min(maxY, point.y)) + "px";
 }
 
 interactButton.addEventListener("click", interact);

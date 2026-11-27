@@ -21,6 +21,7 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 #room { display: block; width: 100%; height: 100%; outline: none; image-rendering: pixelated; touch-action: none; }
 #room.armed { cursor: crosshair; }
 .interact { position: absolute; z-index: 1; transform: translate(-50%, -100%); display: flex; align-items: center; gap: 7px; min-height: 32px; padding: 4px 8px; border: 1px solid #92bb97; background: #162a20; color: #d8f1d9; box-shadow: 0 3px #0b1710a8; white-space: nowrap; font: 700 .8rem var(--mono); }
+.interact.below { transform: translateX(-50%); }
 .interact:hover { background: #294837; }
 .interact kbd { min-width: 21px; min-height: 20px; color: #ddf8d9; border-color: #547863; }
 [hidden] { display: none !important; }

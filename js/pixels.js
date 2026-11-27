@@ -3,14 +3,6 @@ export function box(ctx, color, x, y, width, height) {
   ctx.fillRect(x, y, width, height);
 }
 
-export function label(ctx, text, x, y, color, size = 7) {
-  ctx.font = "bold " + size + "px monospace";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "top";
-  ctx.fillStyle = color;
-  ctx.fillText(text, x, y);
-}
-
 export function pixels(ctx, color, x, y, size = 1) {
   box(ctx, color, Math.round(x), Math.round(y), size, size);
 }

@@ -1,20 +1,7 @@
-import { box, gunRay, label, line, pixels } from "./pixels.js";
+import { label, textWidth } from "./pixel-font.js";
+import { box, gunRay, line, pixels } from "./pixels.js";
 
 const robotTopOffset = { swarm: 10, spider: 17, agent: 26, walker: 33, furry: 36 };
-const healthGlyphs = {
-  0: ["01110", "10001", "10001", "10001", "10001", "10001", "01110"],
-  1: ["00100", "01100", "00100", "00100", "00100", "00100", "01110"],
-  2: ["01110", "10001", "00001", "00010", "00100", "01000", "11111"],
-  3: ["11110", "00001", "00001", "01110", "00001", "00001", "11110"],
-  4: ["00010", "00110", "01010", "10010", "11111", "00010", "00010"],
-  5: ["11111", "10000", "10000", "11110", "00001", "10001", "01110"],
-  6: ["00110", "01000", "10000", "11110", "10001", "10001", "01110"],
-  7: ["11111", "00001", "00010", "00100", "01000", "01000", "01000"],
-  8: ["01110", "10001", "10001", "01110", "10001", "10001", "01110"],
-  9: ["01110", "10001", "10001", "01111", "00001", "00010", "01100"],
-  H: ["10001", "10001", "10001", "11111", "10001", "10001", "10001"],
-  P: ["11110", "10001", "10001", "11110", "10000", "10000", "10000"],
-};
 const weaponIcons = {
   pistol: [
     "....................",
@@ -90,28 +77,8 @@ export function drawWeaponIcon(ctx, weapon) {
 
 function playerStatus(player, weapon) {
   const height = weapon ? 27 : 16;
-  const half = weapon ? Math.max(21, Math.ceil(weapon.name.length * 2.2) + 4) : 21;
+  const half = weapon ? Math.max(21, Math.ceil(textWidth(weapon.name) / 2) + 4) : 21;
   return { x: Math.round(player.x), y: Math.round(player.y) - 24 - height, half, height };
-}
-
-function drawHealthText(ctx, hp, x, y) {
-  const digits = String(hp);
-  const width = (digits.length + 2) * 6 + 3;
-  let left = x - Math.floor(width / 2);
-  ctx.fillStyle = "#fff3d8";
-  for (const character of digits + " HP") {
-    if (character === " ") {
-      left += 4;
-      continue;
-    }
-    const glyph = healthGlyphs[character];
-    for (let row = 0; row < glyph.length; row++) {
-      for (let col = 0; col < glyph[row].length; col++) {
-        if (glyph[row][col] === "1") ctx.fillRect(left + col, y + row, 1, 1);
-      }
-    }
-    left += 6;
-  }
 }
 
 export function drawPlayer(ctx, player, action, time) {
@@ -159,8 +126,8 @@ export function drawPlayer(ctx, player, action, time) {
   const weapon = action.armed ? action.weapon : null;
   const status = playerStatus(player, weapon);
   box(ctx, "#111e17", x - status.half, status.y, status.half * 2, status.height);
-  if (weapon) label(ctx, weapon.name, x, status.y + 2, weapon.color, 7);
-  drawHealthText(ctx, player.hp, x, y - 37);
+  if (weapon) label(ctx, weapon.name, x, status.y + 2, weapon.color);
+  label(ctx, player.hp + " HP", x, y - 37, "#fff3d8");
   box(ctx, "#653b39", x - 17, y - 28, 34, 3);
   box(ctx, player.hp > 35 ? "#8fd39b" : "#fa8d79", x - 17, y - 28, Math.ceil(34 * player.hp / 100), 3);
 }
@@ -302,13 +269,44 @@ export function drawRobot(ctx, robot, time) {
   }
 }
 
-function findTagPosition(occupied, view, anchorX, anchorY, feetY, half, height) {
+function findSpareTagPosition(occupied, view, center, above, half, height, alignedRows) {
+  const rows = alignedRows ? [...alignedRows] : [view.top, ...occupied.flatMap(tag => [tag.y + tag.height + 2, tag.y - height - 2])];
+  rows.sort((a, b) => Math.abs(a - above) - Math.abs(b - above));
+  const columns = [...occupied].sort((a, b) => (a.x - a.half) - (b.x - b.half));
+  const right = view.right - half;
+  for (const y of rows) {
+    if (y < view.top || y + height > view.bottom) continue;
+    let left = view.left + half;
+    let bestX;
+    for (const tag of columns) {
+      if (tag.y >= y + height + 2 || y >= tag.y + tag.height + 2) continue;
+      const end = Math.min(right, tag.x - tag.half - half - 2);
+      if (left <= end) {
+        if (alignedRows) return { x: left, y };
+        const x = Math.max(left, Math.min(end, center));
+        if (bestX === undefined || Math.abs(x - center) < Math.abs(bestX - center)) bestX = x;
+      }
+      left = Math.max(left, tag.x + tag.half + half + 2);
+    }
+    if (left <= right) {
+      if (alignedRows) return { x: left, y };
+      const x = Math.max(left, Math.min(right, center));
+      if (bestX === undefined || Math.abs(x - center) < Math.abs(bestX - center)) bestX = x;
+    }
+    if (bestX !== undefined) return { x: bestX, y };
+  }
+  return { x: center, y: above };
+}
+
+function findTagPosition(occupied, view, anchorX, anchorY, feetY, half, height, alignedRows) {
   const clampX = x => Math.max(view.left + half, Math.min(view.right - half, x));
   const clampY = y => Math.max(view.top, Math.min(view.bottom - height, y));
   const center = clampX(anchorX);
   const above = clampY(anchorY - height - 3);
+  if (alignedRows) return findSpareTagPosition(occupied, view, center, above, half, height, alignedRows);
   const below = clampY(feetY + 5);
-  const columns = [center, clampX(anchorX - half - 5), clampX(anchorX + half + 5)];
+  const spacing = half * 2 + 4;
+  const columns = [center, clampX(anchorX - spacing), clampX(anchorX + spacing)];
   for (let offset = 0; above - offset >= view.top || below + offset + height <= view.bottom; offset += height + 2) {
     for (const y of [above - offset, below + offset]) {
       if (y < view.top || y + height > view.bottom) continue;
@@ -319,7 +317,7 @@ function findTagPosition(occupied, view, anchorX, anchorY, feetY, half, height) 
       }
     }
   }
-  return { x: center, y: above };
+  return findSpareTagPosition(occupied, view, center, above, half, height);
 }
 
 export function drawRobotTags(ctx, robots, livingPlayer, camera, weapon = null) {
@@ -328,17 +326,29 @@ export function drawRobotTags(ctx, robots, livingPlayer, camera, weapon = null) 
   const top = Math.round(camera.y);
   const view = { left: left + 3, right: left + camera.w - 3, top: top + 3, bottom: top + camera.h - 3 };
   const tags = [];
+  const visible = [];
+  const tagHeight = 23;
   const occupied = livingPlayer ? [playerStatus(livingPlayer, weapon)] : [];
   for (const robot of robots) {
     if (robot.x < left - 12 || robot.x > view.right + 15 || robot.y < top || robot.y > view.bottom + 33) continue;
-    const size = robot.kind === "swarm" ? 7 : 8;
     const anchorX = Math.round(robot.x);
     const feetY = Math.round(robot.y);
     const anchorY = feetY - robotTopOffset[robot.kind];
-    const half = Math.ceil(robot.name.length * size * 0.3) + 4;
-    const height = size + 7;
-    const { x, y } = findTagPosition(occupied, view, anchorX, anchorY, feetY, half, height);
-    const tag = { x, y, anchorX, anchorY, feetY, half, size, height, robot };
+    const hp = robot.hp + " HP";
+    const half = Math.ceil(Math.max(textWidth(robot.name), textWidth(hp)) / 2) + 4;
+    visible.push({ anchorX, anchorY, feetY, half, hp, robot });
+  }
+  visible.sort((a, b) => b.half - a.half);
+  let rows;
+  if (visible.length >= 18) {
+    // Shared baselines leave usable gaps when both copies of an encounter are active.
+    rows = [];
+    for (let row = view.top; row + tagHeight <= view.bottom; row += tagHeight + 2) rows.push(row);
+  }
+  for (const entry of visible) {
+    const { anchorX, anchorY, feetY, half } = entry;
+    const { x, y } = findTagPosition(occupied, view, anchorX, anchorY, feetY, half, tagHeight, rows);
+    const tag = { ...entry, x, y, height: tagHeight };
     tags.push(tag);
     occupied.push(tag);
   }
@@ -346,13 +356,13 @@ export function drawRobotTags(ctx, robots, livingPlayer, camera, weapon = null) 
     const above = y < anchorY;
     line(ctx, robot.color + "79", x, above ? y + height : y, anchorX, above ? anchorY : feetY + 2);
   }
-  for (const { x, y, half, size, height, robot } of tags) {
-    const barWidth = robot.kind === "swarm" ? 18 : 30;
-    const barLeft = x - barWidth / 2;
+  for (const { x, y, half, height, hp, robot } of tags) {
+    const barLeft = x - 17;
     box(ctx, "#17251ff0", x - half, y, 2 * half, height);
-    label(ctx, robot.name, x, y + 1, robot.color, size);
-    box(ctx, "#634442", barLeft, y + height - 5, barWidth, 3);
-    box(ctx, "#ee8a75", barLeft, y + height - 5, Math.ceil(barWidth * robot.hp / robot.maxHp), 3);
+    label(ctx, robot.name, x, y + 2, robot.color);
+    label(ctx, hp, x, y + 10, "#fff3d8");
+    box(ctx, "#634442", barLeft, y + 18, 34, 3);
+    box(ctx, "#ee8a75", barLeft, y + 18, Math.max(1, Math.floor(34 * robot.hp / robot.maxHp)), 3);
   }
 }
 
@@ -373,8 +383,10 @@ export function drawVisitor(ctx, visitor, time, player) {
   box(ctx, "#f2e3c3", x - 3, y - 21, 6, 1);
 
   if (Math.hypot(x - player.x, y - player.y) < 94 || time < visitor.labelUntil) {
-    box(ctx, "#192921f5", x - 45, y - 40, 90, 11);
-    label(ctx, "Линус Торвальдс", x, y - 38, "#f2e3c3", 8);
+    const name = "Линус Торвальдс";
+    const half = Math.ceil(textWidth(name) / 2) + 4;
+    box(ctx, "#192921f5", x - half, y - 40, half * 2, 11);
+    label(ctx, name, x, y - 38, "#f2e3c3");
   }
 }
 
