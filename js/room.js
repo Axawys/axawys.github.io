@@ -1,5 +1,5 @@
 import { box, label, pixels } from "./pixels.js";
-import { drawEffects, drawPlayer, drawRobot, drawRobotTags, drawVisitor, drawWeapon } from "./sprites.js";
+import { drawBlastZones, drawEffects, drawPlayer, drawRobot, drawRobotTags, drawVisitor, drawWeapon } from "./sprites.js";
 
 export const width = 980;
 export const height = 670;
@@ -159,6 +159,14 @@ export function createRenderer(canvas) {
     context.save();
     context.translate(-Math.round(camera.x) + offsetX, -Math.round(camera.y) + offsetY);
     context.drawImage(backdrop, 0, 0);
+    if (action.pending.some(event => event.blast)) {
+      context.save();
+      context.beginPath();
+      context.rect(floor.left, floor.top, floor.right - floor.left, floor.bottom - floor.top);
+      context.clip();
+      drawBlastZones(context, action.pending);
+      context.restore();
+    }
     const weapon = action.armed ? action.weapon : null;
     const layers = [...fixedLayers];
     for (const station of stations) {
@@ -202,9 +210,9 @@ function drawOffice(ctx) {
     box(ctx, "#638c74", x + 3, 15, 62, 3);
     box(ctx, "#addbb5", x + 5, 15, 58, 1);
   }
-  box(ctx, "#89ab90", 457, 30, 66, 18);
-  box(ctx, "#354f40", 458, 31, 64, 16);
-  label(ctx, "LINUX LAB", 490, 35, "#c4e0bc", 10);
+  box(ctx, "#89ab90", 449, 25, 82, 16);
+  box(ctx, "#354f40", 450, 26, 80, 14);
+  label(ctx, "LINUX LAB", 490, 28, "#c4e0bc", 10);
 
   const tileColors = ["#23362e", "#253930", "#263a31", "#24372f", "#273b32"];
   box(ctx, "#1a2c25", 10, 41, width - 20, 603);

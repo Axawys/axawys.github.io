@@ -148,6 +148,14 @@ export function drawPlayer(ctx, player, action, time) {
     box(ctx, "#483328", face + 4, y - 15 + bob, 1, 1);
   }
 
+  if (action.medal) {
+    line(ctx, "#c66c59", x - 3, y - 13 + bob, x, y - 9 + bob);
+    line(ctx, "#e69b76", x + 3, y - 13 + bob, x, y - 9 + bob);
+    box(ctx, "#845527", x - 2, y - 10 + bob, 5, 4);
+    box(ctx, "#f4c45d", x - 1, y - 10 + bob, 3, 3);
+    box(ctx, "#ffefaa", x, y - 10 + bob, 1, 1);
+  }
+
   const weapon = action.armed ? action.weapon : null;
   const status = playerStatus(player, weapon);
   box(ctx, "#111e17", x - status.half, status.y, status.half * 2, status.height);
@@ -392,6 +400,51 @@ function drawGentooFire(ctx, x, y, time) {
   }
 }
 
+export function drawBlastZones(ctx, pending) {
+  for (const { blast, phase } of pending) {
+    if (!blast) continue;
+    const { x, y, radius } = blast;
+    ctx.fillStyle = phase === "fire" ? "#e7794e26" : "#e7794e17";
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, 2 * Math.PI);
+    ctx.fill();
+    const color = phase === "fire" ? "#f5a474" : "#bd765a";
+    for (let i = 0; i < 48; i++) {
+      const angle = i * Math.PI / 24;
+      const end = angle + 0.077;
+      line(ctx, color, x + Math.cos(angle) * radius, y + Math.sin(angle) * radius,
+        x + Math.cos(end) * radius, y + Math.sin(end) * radius, 2);
+    }
+  }
+}
+
+function drawCelebration(ctx, show) {
+  if (!show) return;
+  for (const { x, y, start, radius, color, spin } of show.launches) {
+    const age = show.elapsed - start;
+    if (age < 0.32) {
+      const tip = y + 43 * (1 - age / 0.32);
+      line(ctx, color + "8e", x, tip + 13, x, tip + 2);
+      pixels(ctx, "#fff1ba", x - 1, tip, 3);
+      continue;
+    }
+    const progress = (age - 0.32) / 1.13;
+    const growth = 1 - (1 - progress) ** 2;
+    ctx.globalAlpha = (1 - progress) ** 0.7;
+    for (let i = 0; i < 38; i++) {
+      const angle = (i / 38 + spin) * Math.PI * 2;
+      const spread = radius * growth * (i % 3 === 0 ? 0.64 : 1);
+      const px = x + Math.cos(angle) * spread;
+      const py = y + Math.sin(angle) * spread + progress ** 2 * 16;
+      if (i % 2 === 0) {
+        line(ctx, color + "88", px - Math.cos(angle) * 5, py - Math.sin(angle) * 5, px, py);
+      }
+      pixels(ctx, i % 6 === 0 ? "#fff1ba" : color, px, py, progress < 0.48 ? 2 : 1);
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+
 export function drawEffects(ctx, action, time) {
   for (const { station, remaining, phase: heat } of action.pending) {
     if (heat === "fire") {
@@ -438,4 +491,5 @@ export function drawEffects(ctx, action, time) {
     pixels(ctx, "#fff6ce", shot.x - 2, shot.y - 2, 5);
   }
   ctx.globalAlpha = 1;
+  drawCelebration(ctx, action.celebration);
 }

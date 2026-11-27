@@ -1,5 +1,6 @@
 import { door, height, isWalkable, moveBody, player, width } from "./room.js";
 import { makeField, nearestCell, pursue } from "./navigation.js";
+import { tasks } from "./tasks.js";
 import { createWeapons } from "./weapons.js";
 
 const robotTypes = {
@@ -12,6 +13,9 @@ const robotTypes = {
 
 const gentooOverheat = 2;
 const gentooFire = 3;
+const gentooRadius = 106;
+const celebrationDuration = 10;
+const fireworkColors = ["#ffb578", "#92c9ff", "#f7dc8e", "#e9a1df", "#9af0bd"];
 
 const swarmMembers = [
   { kind: "agent", name: "Claude Code", color: "#f3ae91", dx: -47, dy: 43 },
@@ -42,11 +46,12 @@ function nearFree(x, y, radius) {
   return null;
 }
 
-export function createAction(onNotice = () => {}) {
+export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
   const state = {
     time: 0, aim: { x: player.x, y: player.y - 48, visible: false },
     robots: [], particles: [], shocks: [], shots: [], projectiles: [], pending: [], visitor: null,
-    dead: false, invulnerable: 0, shake: 0,
+    dead: false, invulnerable: 0, shake: 0, celebration: null, medal: false,
+    get ammo() { return arsenal.ammo; },
     get weapon() { return arsenal.equipped; },
     get armed() { return !this.dead && this.robots.length > 0; },
   };
@@ -55,6 +60,8 @@ export function createAction(onNotice = () => {}) {
   let playerCell = -1;
   let playerField;
   const queuedVisitors = [];
+  const encountered = new Set();
+  let celebrated = false;
   const doorField = makeField(nearestCell(door.x, door.y));
 
   function burst(x, y, colors, count, force, smoke = false) {
@@ -104,6 +111,7 @@ export function createAction(onNotice = () => {}) {
       }
     }
     Object.assign(player, point ?? { x: 490, y: 471 }, { hp: 100, moving: false, facing: "north" });
+    arsenal.refill();
     state.dead = false;
     state.invulnerable = 1.25;
     state.shake = 0;
@@ -133,6 +141,7 @@ export function createAction(onNotice = () => {}) {
   }
 
   function trigger(event, station, view) {
+    encountered.add(event);
     if (event === "visitor") {
       if (state.visitor) queuedVisitors.push(view);
       else callVisitor(view);
@@ -140,22 +149,27 @@ export function createAction(onNotice = () => {}) {
     }
     station.busy = true;
     if (event === "explosion") {
-      state.pending.push({ event, station, phase: "overheat", remaining: gentooOverheat + gentooFire });
+      state.pending.push({
+        event, station, phase: "overheat", remaining: gentooOverheat + gentooFire,
+        blast: { x: station.x, y: station.y + 5, radius: gentooRadius },
+      });
     } else {
       state.pending.push({ event, station, remaining: 0.32 });
     }
   }
 
-  function finishEvent({ event, station }) {
+  function finishEvent({ event, station, blast }) {
     station.offline = true;
     const { x, y } = station;
     if (event === "explosion") {
-      shock(x, y + 5, 106, "#ffb86b", 0.67);
+      shock(blast.x, blast.y, blast.radius, "#ffb86b", 0.67);
       shock(x, y + 4, 65, "#ffe1a2", 0.4);
       burst(x, y - 5, ["#fff1bb", "#ffc277", "#ff914f", "#de673c", "#6e4a3e"], 107, 265);
       burst(x, y + 2, ["#554b46", "#716054", "#353c38"], 35, 75, true);
-      hitPlayer(100, true);
-      state.shake = 1;
+      const distance = Math.hypot(player.x - blast.x, player.y - blast.y);
+      if (distance <= blast.radius) hitPlayer(100, true);
+      const shake = Math.min(1, Math.max(0, 1 - (distance - blast.radius) / 130));
+      state.shake = Math.max(state.shake, shake);
       return;
     }
 
@@ -238,12 +252,44 @@ export function createAction(onNotice = () => {}) {
     }
   }
 
-  function update(elapsed, holding, pressed = false, gentooElapsed = elapsed) {
+  function advanceCelebration(elapsed) {
+    if (celebrated) return;
+    if (!state.celebration) {
+      if (encountered.size !== tasks.length || state.dead || state.robots.length
+        || state.pending.length || state.visitor || queuedVisitors.length) return;
+      state.celebration = { elapsed: 0, nextLaunch: 0, launches: [], count: 0 };
+      elapsed = 0;
+    }
+    const show = state.celebration;
+    show.elapsed += elapsed;
+    if (show.elapsed >= celebrationDuration) {
+      state.celebration = null;
+      state.medal = true;
+      celebrated = true;
+      onCelebrated();
+      return;
+    }
+
+    show.launches = show.launches.filter(launch => show.elapsed - launch.start < 1.45);
+    while (show.nextLaunch <= show.elapsed && show.nextLaunch < celebrationDuration - 0.6) {
+      const side = show.count % 2 ? 1 : -1;
+      const x = Math.max(32, Math.min(width - 32, player.x + side * (29 + Math.random() * 53)));
+      const y = Math.max(57, Math.min(height - 52, player.y - 63 + Math.random() * 82));
+      show.launches.push({
+        x, y, start: show.nextLaunch, radius: 26 + Math.random() * 17,
+        color: fireworkColors[show.count % fireworkColors.length], spin: Math.random(),
+      });
+      show.count++;
+      show.nextLaunch += 0.44;
+    }
+  }
+
+  function update(elapsed, holding, pressed = false, sceneElapsed = elapsed) {
     state.time += elapsed;
     state.invulnerable = Math.max(0, state.invulnerable - elapsed);
     state.shake = Math.max(0, state.shake - elapsed * 2.7);
     for (const event of state.pending) {
-      event.remaining -= event.phase ? gentooElapsed : elapsed;
+      event.remaining -= event.blast ? sceneElapsed : elapsed;
       if (event.remaining <= 0) finishEvent(event);
       else if (event.phase === "overheat" && event.remaining <= gentooFire) event.phase = "fire";
     }
@@ -263,6 +309,7 @@ export function createAction(onNotice = () => {}) {
     state.shots = state.shots.filter(shot => shot.life > 0);
     advanceVisitor(elapsed);
     arsenal.update(elapsed, holding, pressed);
+    advanceCelebration(sceneElapsed);
 
     if (state.dead) {
       reviveIn -= elapsed;

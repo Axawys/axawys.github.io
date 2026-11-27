@@ -6,3 +6,5 @@ export const tasks = [
   { system: "Omarchy", title: "Удалить систему Omarchy", command: "sudo rm -rf /", event: "swarm", achievement: "Атака ИИ-агентов" },
   { system: "NixOS", title: "Удалить хранилище NixOS", command: "sudo rm -rf /nix/store", event: "furry", achievement: "Пушистая ярость" },
 ];
+
+export const finaleAchievement = { system: "Linux Lab", event: "linux-user", achievement: "Теперь ты настоящий линуксоид" };

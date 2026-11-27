@@ -95,5 +95,5 @@ export function createAchievements(tasks, restoreFocus) {
     render();
   });
   render();
-  return { unlock, toggle, get isOpen() { return dialog.open; } };
+  return { unlock, toggle, has: event => unlocked.has(event), get isOpen() { return dialog.open; } };
 }

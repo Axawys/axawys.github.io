@@ -3,7 +3,7 @@ import { createAchievements } from "./achievements.js";
 import { createRenderer, movePlayer, nearestInteraction, noteSpots, player, stations } from "./room.js";
 import { drawWeaponIcon } from "./sprites.js";
 import { shuffleSystems } from "./systems.js";
-import { tasks } from "./tasks.js";
+import { finaleAchievement, tasks } from "./tasks.js";
 import { createTerminal } from "./terminal.js";
 import { weapons } from "./weapons.js";
 
@@ -30,8 +30,9 @@ const notes = [note, ...stations.map((station, index) => ({
 }))];
 
 const renderer = createRenderer(canvas);
-const action = createAction(showNotice);
-const achievements = createAchievements(tasks, () => canvas.focus({ preventScroll: true }));
+const achievements = createAchievements([...tasks, finaleAchievement], () => canvas.focus({ preventScroll: true }));
+const action = createAction(showNotice, () => achievements.unlock(finaleAchievement));
+action.state.medal = achievements.has(finaleAchievement.event);
 const terminal = createTerminal(stations, systems, (task, station) => {
   taskRows.get(task).classList.add("done");
   action.trigger(task.event, station, renderer.camera);
@@ -43,6 +44,7 @@ const slotButtons = weapons.map((weapon, index) => {
   const key = document.createElement("kbd");
   const icon = document.createElement("canvas");
   const name = document.createElement("span");
+  const ammo = document.createElement("small");
   const number = String(index + 1);
   slot.className = "weapon-slot";
   slot.type = "button";
@@ -56,21 +58,28 @@ const slotButtons = weapons.map((weapon, index) => {
   icon.setAttribute("aria-hidden", "true");
   drawWeaponIcon(icon.getContext("2d"), weapon);
   name.textContent = weapon.name;
-  slot.append(key, icon, name);
+  ammo.className = "weapon-ammo";
+  ammo.setAttribute("aria-hidden", "true");
+  slot.append(key, ammo, icon, name);
   slot.addEventListener("click", () => action.selectWeapon(index));
   weaponSlots.append(slot);
-  return slot;
+  return { slot, ammo };
 });
 let shownWeapon;
 
 function updateWeaponSlots() {
-  const { armed, weapon } = action.state;
+  const { armed, weapon, ammo } = action.state;
   if (weaponSlots.hidden === armed) weaponSlots.hidden = !armed;
-  if (!armed || weapon === shownWeapon) return;
-  shownWeapon = weapon;
-  for (const [index, slot] of slotButtons.entries()) {
-    slot.setAttribute("aria-pressed", String(weapons[index] === weapon));
+  if (!armed) return;
+  for (const [index, button] of slotButtons.entries()) {
+    if (weapon !== shownWeapon) button.slot.setAttribute("aria-pressed", String(weapons[index] === weapon));
+    const count = String(ammo[index]);
+    if (button.ammo.textContent === count) continue;
+    button.ammo.textContent = count;
+    button.slot.classList.toggle("empty", ammo[index] === 0);
+    button.slot.setAttribute("aria-label", weapons[index].name + " · боезапас " + count);
   }
+  shownWeapon = weapon;
 }
 
 function showNotice(message, warning = false) {
@@ -309,6 +318,7 @@ function frame(time) {
   if (death.hidden === action.state.dead) death.hidden = !action.state.dead;
   while (activeNotices[0]?.expires <= action.state.time) activeNotices.shift().element.remove();
   canvas.classList.toggle("armed", action.state.armed);
+  if (!action.state.medal && achievements.has(finaleAchievement.event)) action.state.medal = true;
   updateWeaponSlots();
   renderer.draw({ nearby, visited: terminal.visited, notes, action: action.state, time: action.state.time });
   requestAnimationFrame(frame);
