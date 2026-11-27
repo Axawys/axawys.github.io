@@ -1,271 +1,184 @@
-import { createRenderer, height, movePlayer, nearestStation, stations, width } from "./room.js";
-import { createFastfetch, shuffleSystems } from "./systems.js";
+import { createAction } from "./action.js";
+import { createRenderer, movePlayer, nearestInteraction, noteSpots, player, stations } from "./room.js";
+import { tasks } from "./tasks.js";
+import { createTerminal } from "./terminal.js";
 
 const byId = id => document.getElementById(id);
 const canvas = byId("room");
 const interactButton = byId("interact");
-const interactionTitle = byId("interaction-title");
-const interactionDetail = byId("interaction-detail");
-const stationList = byId("station-list");
-const score = byId("score");
-const progressSegments = [...byId("progress-track").children];
+const interactText = interactButton.querySelector("span");
+const noteDialog = byId("note");
+const noteList = byId("tasks");
+const health = byId("health");
+const death = byId("death");
+const note = noteSpots[Math.floor(Math.random() * noteSpots.length)];
 
-const dialog = byId("computer");
-const terminal = byId("terminal-screen");
-const output = byId("terminal-output");
-const form = byId("terminal-form");
-const input = byId("command");
-const promptLabel = byId("prompt");
-
-const render = createRenderer(canvas);
-const systems = shuffleSystems();
-const visited = new Set();
-const keys = new Set();
-const pointers = new Map();
-const movement = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowLeft", "ArrowDown", "ArrowRight"]);
-let nearby;
-let active;
-let previousTime;
-
-const sessions = stations.map((station, index) => {
-  const system = systems[index];
-  const id = "PC-" + String(station.number).padStart(2, "0");
-  const row = document.createElement("li");
-  const number = document.createElement("span");
-  const name = document.createElement("span");
-  const mark = document.createElement("i");
-  row.className = "station";
-  row.style.setProperty("--system-color", system.color);
-  number.className = "station-id";
-  number.textContent = id;
-  name.className = "station-name";
-  name.textContent = "Неизвестно";
-  mark.className = "station-mark";
-  mark.setAttribute("aria-hidden", "true");
-  row.append(number, name, mark);
-  stationList.append(row);
-
-  const intro = document.createElement("p");
-  intro.className = "terminal-intro";
-  const command = document.createElement("code");
-  command.textContent = "fastfetch";
-  intro.append("Введите ", command, ", чтобы посмотреть сведения о системе.");
-  return { id, row, name, system, station, lines: [intro], history: [], cursor: 0, draft: "" };
+const renderer = createRenderer(canvas);
+const action = createAction();
+const terminal = createTerminal(stations, (task, station) => {
+  taskRows.get(task).classList.add("done");
+  action.trigger(task.event, station, renderer.camera);
 });
 
-function setNearby(station) {
-  if (station === nearby) return;
-  nearby = station;
-  const session = nearby && sessions[nearby.number - 1];
-  for (const item of sessions) item.row.classList.toggle("near", item === session);
-
-  interactButton.disabled = !session;
-  if (session) {
-    interactionTitle.textContent = session.id + " · в зоне доступа";
-    interactionDetail.textContent = "Нажмите E или кнопку, чтобы сесть за компьютер.";
-  } else {
-    interactionTitle.textContent = "Подойдите к компьютеру";
-    interactionDetail.textContent = "Введите fastfetch, чтобы узнать, какая система установлена.";
+const taskRows = new Map(tasks.map(task => {
+  const row = document.createElement("li");
+  const title = document.createElement("strong");
+  title.textContent = task.title;
+  const instruction = document.createElement("span");
+  if (task.setup) {
+    const setup = document.createElement("code");
+    setup.textContent = task.setup;
+    instruction.append(setup, " → ");
   }
+  const command = document.createElement("code");
+  command.textContent = task.command;
+  instruction.append(command);
+  row.append(title, instruction);
+  noteList.append(row);
+  return [task, row];
+}));
+
+const keys = new Set();
+const directions = new Map();
+const movement = new Set(["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowLeft", "ArrowDown", "ArrowRight"]);
+let nearby;
+let previousTime;
+let pointer;
+let shootingPointer;
+let shotRequest;
+
+function interact() {
+  if (action.state.dead || terminal.isOpen || noteDialog.open) return;
+  const target = nearestInteraction(note);
+  if (!target) return;
+
+  resetInput();
+  if (target === note) noteDialog.showModal();
+  else terminal.open(target);
 }
 
-function discover(session) {
-  const { number } = session.station;
-  if (visited.has(number)) return;
-  visited.add(number);
-  session.name.textContent = session.system.name;
-  session.row.classList.add("found");
-  score.value = visited.size + " / " + stations.length;
-  progressSegments[visited.size - 1].classList.add("filled");
-}
-
-function openComputer() {
-  const station = nearestStation();
-  if (!station || active) return;
-
-  active = sessions[station.number - 1];
-  resetMovement();
-  active.cursor = active.history.length;
-  active.draft = "";
-  input.value = "";
-  byId("computer-name").textContent = active.id;
-  promptLabel.textContent = activePrompt();
-  output.replaceChildren(...active.lines);
-  dialog.showModal();
-  focusTerminal();
-}
-
-function closeComputer() {
-  if (!active) return;
-  active = undefined;
-  dialog.close();
+function closeNote() {
+  noteDialog.close();
   canvas.focus({ preventScroll: true });
 }
 
-function activePrompt() {
-  return "operator@" + active.id.toLowerCase() + ":~$";
-}
-
-function focusTerminal() {
-  input.focus({ preventScroll: true });
-  terminal.scrollTop = terminal.scrollHeight;
-}
-
-function addLine(node) {
-  active.lines.push(node);
-  output.append(node);
-  if (active.lines.length > 120) active.lines.shift().remove();
-}
-
-function print(text, prompt) {
-  const line = document.createElement("p");
-  line.className = "terminal-line";
-  if (prompt) {
-    const prefix = document.createElement("span");
-    prefix.className = "terminal-prompt";
-    prefix.textContent = prompt + " ";
-    line.append(prefix);
-  }
-  line.append(text);
-  addLine(line);
-}
-
-function clearTerminal() {
-  active.lines.length = 0;
-  output.replaceChildren();
-  focusTerminal();
-}
-
-function execute(command) {
-  const text = command.trim();
-  input.value = "";
-  if (!text) {
-    print("", activePrompt());
-    focusTerminal();
-    return;
-  }
-
-  if (active.history.at(-1) !== text) {
-    active.history.push(text);
-    if (active.history.length > 80) active.history.shift();
-  }
-  active.cursor = active.history.length;
-  active.draft = "";
-
-  if (text === "clear") {
-    clearTerminal();
-    return;
-  }
-
-  print(text, activePrompt());
-  switch (text) {
-    case "exit":
-      closeComputer();
-      return;
-    case "fastfetch":
-      addLine(createFastfetch(active.system, active.id.toLowerCase()));
-      discover(active);
-      break;
-    case "whoami":
-      print("operator");
-      break;
-    case "pwd":
-      print("/home/operator");
-      break;
-    case "help":
-      print("Команды: fastfetch, clear, exit, whoami, pwd, help");
-      break;
-    default:
-      print("bash: " + text.split(/\s+/, 1)[0] + ": command not found");
-  }
-  focusTerminal();
-}
-
-function navigateHistory(direction) {
-  const { history, cursor } = active;
-  if (cursor === history.length) active.draft = input.value;
-  active.cursor = Math.max(0, Math.min(history.length, cursor + direction));
-  input.value = active.cursor === history.length ? active.draft : history[active.cursor];
-  input.setSelectionRange(input.value.length, input.value.length);
-}
-
-function resetMovement() {
+function resetInput() {
   keys.clear();
-  pointers.clear();
+  directions.clear();
+  shootingPointer = undefined;
+  shotRequest = undefined;
 }
 
-function isHeld(...codes) {
-  return codes.some(code => keys.has(code) || [...pointers.values()].includes(code));
+function updateInteraction(paused) {
+  const target = paused || action.state.dead ? undefined : nearestInteraction(note);
+  if (target !== nearby) {
+    nearby = target;
+    interactButton.hidden = !target;
+    interactText.textContent = target === note ? "Читать записку" : "Сесть за ПК";
+  }
+  if (!target) return;
+
+  const point = renderer.screenPoint(target.x, target.y - (target === note ? 37 : 20));
+  const half = interactButton.offsetWidth / 2 + 5;
+  interactButton.style.left = Math.max(half, Math.min(canvas.clientWidth - half, point.x)) + "px";
+  interactButton.style.top = Math.max(interactButton.offsetHeight + 5, point.y) + "px";
 }
 
-interactButton.addEventListener("click", openComputer);
-byId("leave").addEventListener("click", closeComputer);
-byId("clear-terminal").addEventListener("click", clearTerminal);
-byId("run-fastfetch").addEventListener("click", () => execute("fastfetch"));
-dialog.addEventListener("cancel", event => {
+interactButton.addEventListener("click", interact);
+byId("close-note").addEventListener("click", closeNote);
+noteDialog.addEventListener("cancel", event => {
   event.preventDefault();
-  closeComputer();
-});
-form.addEventListener("submit", event => {
-  event.preventDefault();
-  execute(input.value);
+  closeNote();
 });
 
 window.addEventListener("keydown", event => {
-  if (active) {
-    if (event.ctrlKey && event.code === "KeyL") {
-      event.preventDefault();
-      clearTerminal();
-    } else if (event.target === input && ["ArrowUp", "ArrowDown"].includes(event.code)) {
-      event.preventDefault();
-      navigateHistory(event.code === "ArrowUp" ? -1 : 1);
-    }
+  if (terminal.isOpen) {
+    terminal.handleKey(event);
     return;
   }
-  if (event.altKey || event.ctrlKey || event.metaKey) return;
+  if (noteDialog.open || action.state.dead || event.altKey || event.ctrlKey || event.metaKey) return;
   if (movement.has(event.code)) {
     event.preventDefault();
     keys.add(event.code);
   } else if (event.code === "KeyE" && !event.repeat) {
-    openComputer();
+    interact();
   }
 });
 
 window.addEventListener("keyup", event => keys.delete(event.code));
-window.addEventListener("blur", resetMovement);
-document.addEventListener("visibilitychange", resetMovement);
+window.addEventListener("blur", resetInput);
+document.addEventListener("visibilitychange", resetInput);
 
 for (const button of document.querySelectorAll("[data-direction]")) {
   button.addEventListener("pointerdown", event => {
-    if (event.button !== 0 || active) return;
+    if (event.button !== 0 || action.state.dead) return;
     event.preventDefault();
     button.setPointerCapture(event.pointerId);
-    pointers.set(event.pointerId, button.dataset.direction);
+    directions.set(event.pointerId, button.dataset.direction);
   });
-  for (const eventType of ["pointerup", "pointercancel", "lostpointercapture"]) {
-    button.addEventListener(eventType, event => pointers.delete(event.pointerId));
+  for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) {
+    button.addEventListener(type, event => directions.delete(event.pointerId));
   }
 }
 
-canvas.addEventListener("click", event => {
-  const station = nearestStation();
-  if (!station) return;
+function aim(event) {
+  if (event.pointerType === "touch" && event.pointerId !== shootingPointer) return;
+  pointer = { x: event.clientX, y: event.clientY };
+}
 
-  const bounds = canvas.getBoundingClientRect();
-  const x = (event.clientX - bounds.left) * width / bounds.width;
-  const y = (event.clientY - bounds.top) * height / bounds.height;
-  if (Math.abs(x - station.x) <= 34 && y >= station.y - 16 && y <= station.y + 34) openComputer();
+canvas.addEventListener("pointermove", aim);
+canvas.addEventListener("pointerdown", event => {
+  if (event.button !== 0 || !action.state.armed || action.state.dead || shootingPointer !== undefined) return;
+  shootingPointer = event.pointerId;
+  canvas.setPointerCapture(event.pointerId);
+  aim(event);
+  shotRequest = pointer;
+  event.preventDefault();
+});
+function releaseAim(event) {
+  if (event.pointerId !== shootingPointer && event.type !== "pointerleave") return;
+  if (event.type !== "pointerleave") shootingPointer = undefined;
+  if (event.pointerType === "touch" || event.type === "pointerleave") pointer = undefined;
+}
+for (const type of ["pointerup", "pointercancel", "pointerleave", "lostpointercapture"]) {
+  canvas.addEventListener(type, releaseAim);
+}
+canvas.addEventListener("click", event => {
+  if (action.state.armed || !nearby) return;
+  const point = renderer.worldPoint(event.clientX, event.clientY);
+  if (Math.abs(point.x - nearby.x) < 34 && Math.abs(point.y - nearby.y) < 33) interact();
 });
 
 function frame(time) {
   const elapsed = previousTime === undefined ? 0 : Math.min((time - previousTime) / 1000, 0.033);
   previousTime = time;
-
-  const dx = Number(isHeld("KeyD", "ArrowRight")) - Number(isHeld("KeyA", "ArrowLeft"));
-  const dy = Number(isHeld("KeyS", "ArrowDown")) - Number(isHeld("KeyW", "ArrowUp"));
-  movePlayer(active ? 0 : dx, active ? 0 : dy, elapsed);
-  setNearby(nearestStation());
-  render(nearby, visited, time);
+  const paused = terminal.isOpen || noteDialog.open;
+  const canMove = !paused && !action.state.dead;
+  const pressed = new Set([...keys, ...directions.values()]);
+  const dx = Number(pressed.has("KeyD") || pressed.has("ArrowRight")) - Number(pressed.has("KeyA") || pressed.has("ArrowLeft"));
+  const dy = Number(pressed.has("KeyS") || pressed.has("ArrowDown")) - Number(pressed.has("KeyW") || pressed.has("ArrowUp"));
+  movePlayer(canMove ? dx : 0, canMove ? dy : 0, elapsed);
+  renderer.follow(elapsed, false);
+  const target = pointer ?? shotRequest;
+  if (target) {
+    Object.assign(action.state.aim, renderer.worldPoint(target.x, target.y), {
+      visible: Boolean(pointer) && target.x >= 0 && target.x <= canvas.clientWidth
+        && target.y >= 0 && target.y <= canvas.clientHeight,
+    });
+  } else {
+    action.state.aim.visible = false;
+  }
+  const respawned = !paused && action.update(elapsed, shootingPointer !== undefined || Boolean(shotRequest));
+  shotRequest = undefined;
+  if (respawned) {
+    resetInput();
+    renderer.follow(elapsed, true);
+  }
+  updateInteraction(paused);
+  if (health.value !== String(player.hp)) health.value = String(player.hp);
+  if (death.hidden === action.state.dead) death.hidden = !action.state.dead;
+  canvas.classList.toggle("armed", action.state.armed && !action.state.dead);
+  renderer.draw({ nearby, visited: terminal.visited, note, action: action.state, time: action.state.time });
   requestAnimationFrame(frame);
 }
 

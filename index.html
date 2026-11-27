@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#101714">
-  <meta name="description" content="Пройдитесь по пиксельному компьютерному классу и узнайте, какие Linux-системы стоят на пяти станциях.">
+  <meta name="description" content="Исследуйте пиксельный офис Linux Lab, найдите записку и выполните пять заданий за компьютерами.">
   <link rel="icon" href="./favicon.png" type="image/png">
   <link rel="stylesheet" href="./style.css">
   <script type="module" src="./js/game.js"></script>
@@ -12,58 +12,26 @@
 </head>
 <body>
   <main class="game" id="game">
-    <header class="app-header">
-      <div class="brand">
-        <span class="brand-icon" aria-hidden="true"><span></span></span>
-        <div>
-          <h1>Linux<span> Lab</span></h1>
-          <p>Компьютерный класс</p>
-        </div>
-      </div>
-      <div class="progress">
-        <div class="progress-label">
-          <span>Системы найдены</span>
-          <output id="score" aria-live="polite">0 / 5</output>
-        </div>
-        <div class="progress-track" id="progress-track" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
-      </div>
-    </header>
-
-    <div class="game-layout">
-      <section class="room panel" aria-labelledby="room-title">
-        <div class="room-header">
-          <h2 id="room-title"><span class="room-icon" aria-hidden="true"></span> План класса</h2>
-          <span class="room-legend"><i aria-hidden="true"></i> Вы</span>
-        </div>
-        <canvas id="room" width="360" height="224" tabindex="0" aria-label="Пиксельная карта класса. Двигайтесь с помощью WASD или стрелок. Нажмите E рядом с компьютером."></canvas>
-        <div class="room-footer">
-          <p><strong id="interaction-title">Подойдите к компьютеру</strong><span id="interaction-detail">Введите fastfetch, чтобы узнать, какая система установлена.</span></p>
-          <button type="button" class="interact" id="interact" disabled><kbd aria-hidden="true">E</kbd> Сесть за ПК</button>
-        </div>
-        <div class="touch-controls" aria-label="Экранное управление">
-          <button type="button" data-direction="ArrowUp" aria-label="Вверх">↑</button>
-          <button type="button" data-direction="ArrowLeft" aria-label="Влево">←</button>
-          <button type="button" data-direction="ArrowDown" aria-label="Вниз">↓</button>
-          <button type="button" data-direction="ArrowRight" aria-label="Вправо">→</button>
-        </div>
-      </section>
-
-      <aside class="sidebar">
-        <section class="panel stations" aria-labelledby="station-title">
-          <h2 id="station-title"><span class="station-icon" aria-hidden="true"></span> Станции</h2>
-          <ul id="station-list"></ul>
-        </section>
-        <section class="panel controls" aria-labelledby="control-title">
-          <h2 id="control-title"><span class="keyboard-icon" aria-hidden="true"></span> Управление</h2>
-          <ul>
-            <li><span>Двигаться</span><span class="key-group"><kbd>WASD</kbd><kbd aria-label="Стрелки">↑↓←→</kbd></span></li>
-            <li><span>Сесть за ПК</span><kbd>E</kbd></li>
-            <li><span>Встать из-за ПК</span><kbd>Esc</kbd></li>
-          </ul>
-        </section>
-      </aside>
+    <canvas id="room" tabindex="0" aria-label="Офис Linux Lab. Двигайтесь на WASD или стрелках. Нажмите E рядом с компьютером или запиской."></canvas>
+    <button class="interact" id="interact" type="button" hidden><kbd aria-hidden="true">E</kbd><span></span></button>
+    <div class="touch-controls" aria-label="Экранное управление">
+      <button type="button" data-direction="ArrowUp" aria-label="Вверх">↑</button>
+      <button type="button" data-direction="ArrowLeft" aria-label="Влево">←</button>
+      <button type="button" data-direction="ArrowDown" aria-label="Вниз">↓</button>
+      <button type="button" data-direction="ArrowRight" aria-label="Вправо">→</button>
     </div>
+    <p id="death" role="status" hidden>Вы погибли</p>
+    <output id="health" class="visually-hidden" aria-label="Здоровье">100</output>
   </main>
+
+  <dialog id="note" class="note" aria-labelledby="note-title">
+    <header>
+      <h2 id="note-title">Список дел</h2>
+      <button type="button" id="close-note" aria-label="Закрыть записку" autofocus>×</button>
+    </header>
+    <ul id="tasks"></ul>
+    <p class="note-controls">WASD / стрелки — ходить · E — взаимодействовать<br>ЛКМ — стрелять, когда появится автомат</p>
+  </dialog>
 
   <dialog id="computer" class="computer" aria-labelledby="computer-title">
     <div class="monitor">

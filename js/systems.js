@@ -144,7 +144,7 @@ export function shuffleSystems() {
   return shuffled;
 }
 
-export function createFastfetch(system, hostname) {
+export function createFastfetch(system, hostname, user) {
   const result = document.createElement("div");
   result.className = "terminal-result";
   result.style.setProperty("--system-color", system.color);
@@ -157,7 +157,7 @@ export function createFastfetch(system, hostname) {
   const details = document.createElement("div");
   const host = document.createElement("div");
   host.className = "fetch-host";
-  host.textContent = "operator@" + hostname;
+  host.textContent = user + "@" + hostname;
   const info = document.createElement("dl");
   info.className = "fetch-info";
   const fields = [
