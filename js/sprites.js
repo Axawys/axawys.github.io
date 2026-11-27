@@ -2,6 +2,12 @@ import { box, gunRay, label, line, pixels } from "./pixels.js";
 
 const robotTopOffset = { swarm: 10, spider: 17, agent: 26, walker: 33 };
 
+function playerStatus(player, weapon) {
+  const height = weapon ? 23 : 12;
+  const half = weapon ? Math.max(17, Math.ceil(weapon.name.length * 2.2) + 4) : 17;
+  return { x: Math.round(player.x), y: Math.round(player.y) - 24 - height, half, height };
+}
+
 export function drawPlayer(ctx, player, action, time) {
   const x = Math.round(player.x);
   const y = Math.round(player.y);
@@ -36,23 +42,38 @@ export function drawPlayer(ctx, player, action, time) {
     box(ctx, "#483328", face + 4, y - 15 + bob, 1, 1);
   }
 
-  box(ctx, "#15241ded", x - 17, y - 36, 34, 12);
+  const weapon = action.armed ? action.weapon : null;
+  const status = playerStatus(player, weapon);
+  box(ctx, "#15241ded", x - status.half, status.y, status.half * 2, status.height);
+  if (weapon) label(ctx, weapon.name, x, status.y + 2, weapon.color, 7);
   label(ctx, player.hp + " HP", x, y - 35, "#f0eadb", 7);
   box(ctx, "#653b39", x - 14, y - 27, 28, 2);
   box(ctx, player.hp > 35 ? "#8fd39b" : "#fa8d79", x - 14, y - 27, Math.ceil(28 * player.hp / 100), 2);
 }
 
-export function drawWeapon(ctx, player, aim, laser) {
-  const { x, y, dx, dy, muzzleX, muzzleY } = gunRay(player, aim);
+export function drawWeapon(ctx, player, aim, weapon, laser) {
+  const { x, y, dx, dy, muzzleX, muzzleY } = gunRay(player, aim, weapon.length);
   if (laser) {
-    if (!aim.visible || Math.hypot(aim.x - x, aim.y - y) < 15) return;
-    line(ctx, "#ff404490", muzzleX, muzzleY, aim.x, aim.y);
-    pixels(ctx, "#ff625f", aim.x - 1, aim.y - 1, 3);
+    if (!aim.visible || weapon.kind === "grenade") return;
+    const aimDistance = Math.hypot(aim.x - x, aim.y - y);
+    if (aimDistance < weapon.length + 2) return;
+    const distance = weapon.kind === "flame" ? Math.min(weapon.range, aimDistance) : aimDistance;
+    const endX = x + dx * distance;
+    const endY = y + dy * distance;
+    line(ctx, "#ff404490", muzzleX, muzzleY, endX, endY);
+    pixels(ctx, "#ff625f", endX - 1, endY - 1, 3);
     return;
   }
-  line(ctx, "#161d1b", x - dx * 3 - 1, y - dy * 3 - 1, x + dx * 7 - 1, y + dy * 7 - 1, 4);
-  line(ctx, "#89958a", x - dx * 2, y - dy * 2, x + dx * 7, y + dy * 7, 3);
-  line(ctx, "#a8b7a5", x + dx * 6, y + dy * 6, muzzleX, muzzleY);
+  if (weapon.kind === "grenade") {
+    pixels(ctx, "#1b261d", muzzleX - 2, muzzleY - 2, 6);
+    pixels(ctx, weapon.color, muzzleX - 1, muzzleY - 1, 4);
+    return;
+  }
+  const stock = weapon.length > 9 ? -3 : 0;
+  const body = weapon.length * 0.6;
+  line(ctx, "#161d1b", x + dx * stock - 1, y + dy * stock - 1, x + dx * body - 1, y + dy * body - 1, weapon.thickness + 1);
+  line(ctx, weapon.color, x + dx * stock, y + dy * stock, x + dx * body, y + dy * body, weapon.thickness);
+  line(ctx, "#a8b7a5", x + dx * body, y + dy * body, muzzleX, muzzleY, weapon.kind === "rocket" ? 3 : 1);
   pixels(ctx, "#e44948", muzzleX, muzzleY, 2);
 }
 
@@ -130,13 +151,13 @@ function findTagPosition(occupied, view, anchorX, anchorY, feetY, half, height) 
   return { x: center, y: above };
 }
 
-export function drawRobotTags(ctx, robots, livingPlayer, camera) {
+export function drawRobotTags(ctx, robots, livingPlayer, camera, weapon = null) {
   if (!robots.length) return;
   const left = Math.round(camera.x);
   const top = Math.round(camera.y);
   const view = { left: left + 3, right: left + camera.w - 3, top: top + 3, bottom: top + camera.h - 3 };
   const tags = [];
-  const occupied = livingPlayer ? [{ x: livingPlayer.x, y: livingPlayer.y - 36, half: 17, height: 12 }] : [];
+  const occupied = livingPlayer ? [playerStatus(livingPlayer, weapon)] : [];
   for (const robot of robots) {
     if (robot.x < left - 12 || robot.x > view.right + 15 || robot.y < top || robot.y > view.bottom + 33) continue;
     const size = robot.kind === "swarm" ? 7 : 8;
@@ -235,6 +256,18 @@ export function drawEffects(ctx, action, time) {
     ctx.globalAlpha = Math.min(1, fade * 2);
     const size = Math.max(1, Math.ceil(particle.size * (particle.smoke ? 1.2 - fade * 0.5 : fade)));
     pixels(ctx, particle.color, particle.x, particle.y, size);
+  }
+  ctx.globalAlpha = 1;
+  for (const projectile of action.projectiles) {
+    const { x, y, weapon } = projectile;
+    if (weapon.kind === "rocket") {
+      line(ctx, "#e879456e", x - projectile.dx * 15, y - projectile.dy * 15, x, y, 2);
+      pixels(ctx, "#fff0ab", x - 1, y - 1, 4);
+    } else {
+      pixels(ctx, "#14211bc0", x - 2, y - 1, 5);
+      pixels(ctx, "#718650", x - 2, y - projectile.lift - 2, 5);
+      pixels(ctx, projectile.lift < 1 && Math.floor(time * 16) % 2 ? "#ff9159" : "#d2d793", x, y - projectile.lift - 2, 2);
+    }
   }
   for (const shot of action.shots) {
     ctx.globalAlpha = Math.min(1, shot.life * 13);

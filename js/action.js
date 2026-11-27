@@ -1,6 +1,6 @@
-import { gunRay } from "./pixels.js";
 import { door, height, isWalkable, moveBody, player, width } from "./room.js";
 import { makeField, nearestCell, pursue } from "./navigation.js";
+import { createWeapons } from "./weapons.js";
 
 const robotTypes = {
   spider: { name: "Паук Ubuntu", radius: 5, hitRadius: 10, eye: 8, maxHp: 110, speed: 88, damage: 24, color: "#ff947a" },
@@ -43,12 +43,13 @@ function nearFree(x, y, radius) {
 export function createAction(onNotice = () => {}) {
   const state = {
     time: 0, aim: { x: player.x, y: player.y - 48, visible: false },
-    robots: [], particles: [], shocks: [], shots: [], pending: [], visitor: null,
+    robots: [], particles: [], shocks: [], shots: [], projectiles: [], pending: [], visitor: null,
     dead: false, invulnerable: 0, shake: 0,
+    get weapon() { return arsenal.equipped; },
     get armed() { return !this.dead && this.robots.length > 0; },
   };
   let reviveIn = 0;
-  let reload = 0;
+  const arsenal = createWeapons(state, player, burst, shock);
   let playerCell = -1;
   let playerField;
   const doorField = makeField(nearestCell(door.x, door.y));
@@ -228,52 +229,10 @@ export function createAction(onNotice = () => {}) {
     }
   }
 
-  function fire() {
-    const { x, y, dx, dy, muzzleX, muzzleY } = gunRay(player, state.aim);
-    let range = 560;
-    let obstacleDistance = 0;
-    for (let step = 3; step < range; step += 3) {
-      if (!isWalkable(x + dx * step, y + dy * step + 9, 0)) {
-        obstacleDistance = step;
-        break;
-      }
-    }
-    if (obstacleDistance) range = obstacleDistance;
-
-    let victim;
-    for (const robot of state.robots) {
-      const vx = robot.x - x;
-      const vy = robot.y - robot.eye - y;
-      const longitudinal = vx * dx + vy * dy;
-      const lateral = Math.abs(vx * dy - vy * dx);
-      if (longitudinal < 0 || longitudinal > range || lateral > robot.hitRadius) continue;
-      range = longitudinal;
-      victim = robot;
-    }
-
-    const endX = x + dx * range;
-    const endY = y + dy * range;
-    state.shots.push({ x: muzzleX, y: muzzleY, endX, endY, life: 0.075 });
-    if (victim) {
-      victim.flash = state.time + 0.11;
-      victim.hp -= 24;
-      burst(endX, endY, [victim.color, "#ffe6b1"], 8, 83);
-      if (victim.hp <= 0) {
-        state.robots.splice(state.robots.indexOf(victim), 1);
-        shock(victim.x, victim.y - 3, 22, victim.color, 0.22);
-        burst(victim.x, victim.y - victim.eye, ["#d9c491", "#f5a46b", "#687e72"], 16, 95);
-      }
-    } else if (obstacleDistance) {
-      burst(endX, endY, ["#fedcab", "#877d5e"], 4, 56);
-    }
-    reload = 0.105;
-  }
-
-  function update(elapsed, shooting) {
+  function update(elapsed, holding, pressed = false) {
     state.time += elapsed;
     state.invulnerable = Math.max(0, state.invulnerable - elapsed);
     state.shake = Math.max(0, state.shake - elapsed * 2.7);
-    reload -= elapsed;
     for (const event of state.pending) {
       event.remaining -= elapsed;
       if (event.remaining <= 0) finishEvent(event);
@@ -294,6 +253,7 @@ export function createAction(onNotice = () => {}) {
     state.shocks = state.shocks.filter(effect => effect.life > 0);
     state.shots = state.shots.filter(shot => shot.life > 0);
     advanceVisitor(elapsed);
+    arsenal.update(elapsed, holding, pressed);
 
     if (state.dead) {
       reviveIn -= elapsed;
@@ -303,10 +263,9 @@ export function createAction(onNotice = () => {}) {
       }
       return false;
     }
-    if (state.armed && shooting && reload <= 0) fire();
     if (state.robots.length) advanceRobots(elapsed);
     return false;
   }
 
-  return { state, trigger, update };
+  return { state, trigger, update, cycleWeapon: arsenal.cycle };
 }

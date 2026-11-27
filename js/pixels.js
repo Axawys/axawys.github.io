@@ -42,7 +42,7 @@ export function line(ctx, color, x0, y0, x1, y1, size = 1) {
   }
 }
 
-export function gunRay(player, aim) {
+export function gunRay(player, aim, reach) {
   const x = player.x;
   const y = player.y - 9;
   let dx = aim.x - x;
@@ -55,5 +55,5 @@ export function gunRay(player, aim) {
     dx /= length;
     dy /= length;
   }
-  return { x, y, dx, dy, muzzleX: x + dx * 13, muzzleY: y + dy * 13 };
+  return { x, y, dx, dy, muzzleX: x + dx * reach, muzzleY: y + dy * reach };
 }

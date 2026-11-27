@@ -155,6 +155,7 @@ export function createRenderer(canvas) {
     context.save();
     context.translate(-Math.round(camera.x) + offsetX, -Math.round(camera.y) + offsetY);
     context.drawImage(backdrop, 0, 0);
+    const weapon = action.armed ? action.weapon : null;
     const layers = [...fixedLayers];
     for (const station of stations) {
       const hot = action.pending.some(event => event.station === station && event.phase);
@@ -168,12 +169,12 @@ export function createRenderer(canvas) {
     if (action.visitor) layers.push({ depth: action.visitor.y, draw: () => drawVisitor(context, action.visitor, time, player) });
     layers.push({ depth: player.y, draw: () => {
       drawPlayer(context, player, action, time);
-      if (action.armed) drawWeapon(context, player, action.aim, false);
+      if (weapon) drawWeapon(context, player, action.aim, weapon, false);
     } });
     for (const layer of layers.sort((a, b) => a.depth - b.depth)) layer.draw(context, time * 1000);
-    if (action.armed) drawWeapon(context, player, action.aim, true);
+    if (weapon) drawWeapon(context, player, action.aim, weapon, true);
     drawEffects(context, action, time);
-    drawRobotTags(context, action.robots, action.dead ? null : player, camera);
+    drawRobotTags(context, action.robots, action.dead ? null : player, camera, weapon);
     context.restore();
   }
   return { camera, follow, worldPoint, screenPoint, draw };

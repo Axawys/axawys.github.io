@@ -160,6 +160,12 @@ window.addEventListener("keyup", event => {
 window.addEventListener("blur", resetInput);
 document.addEventListener("visibilitychange", resetInput);
 
+byId("game").addEventListener("wheel", event => {
+  if (!action.state.armed || terminal.isOpen || noteDialog.open || event.ctrlKey || !event.deltaY) return;
+  event.preventDefault();
+  action.cycleWeapon(event.deltaY);
+}, { passive: false });
+
 for (const button of document.querySelectorAll("[data-direction]")) {
   button.addEventListener("pointerdown", event => {
     if (event.button !== 0 || action.state.dead) return;
@@ -228,7 +234,7 @@ function frame(time) {
   } else {
     action.state.aim.visible = false;
   }
-  const respawned = !paused && action.update(elapsed, shootingPointer !== undefined || Boolean(shotRequest));
+  const respawned = !paused && action.update(elapsed, shootingPointer !== undefined, Boolean(shotRequest));
   shotRequest = undefined;
   if (!action.state.armed) stopShooting();
   if (respawned) {
