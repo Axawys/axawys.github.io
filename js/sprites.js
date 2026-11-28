@@ -519,8 +519,7 @@ export function drawVisitor(ctx, visitor, time, player, handshake) {
     const name = visitor.kind === "elder" ? "Старик  " + visitor.hp + " HP" : "Линус Торвальдс";
     const half = Math.ceil(textWidth(name) / 2) + 4;
     const abovePlayer = visitor.kind === "elder" && Math.abs(x - player.x) < half + 37;
-    const tagY = shaking ? Math.min(Math.round((handshake.elder.y + handshake.linus.y) / 2) - 40, Math.round(player.y) - 78)
-      - (visitor.kind === "elder" ? 13 : 0)
+    const tagY = shaking ? Math.round(Math.max(handshake.elder.y, handshake.linus.y)) + (visitor.kind === "elder" ? 4 : 17)
       : abovePlayer ? Math.min(y - 40, Math.round(player.y) - 65) : y - 40;
     box(ctx, "#192921f5", x - half, tagY, half * 2, 11);
     label(ctx, name, x, tagY + 2, "#f2e3c3");
