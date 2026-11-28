@@ -1,30 +1,38 @@
-import { door, height, isWalkable, moveBody, width } from "./room.js";
+import { door, height, isWalkable, moveBody, width, workstationRevision } from "./room.js";
 
 const tile = 10;
 const columns = Math.ceil(width / tile);
 const rows = Math.ceil(height / tile);
 const neighbors = [[0, -1], [1, 0], [0, 1], [-1, 0]];
-const passable = Uint8Array.from({ length: columns * rows }, (_, index) => {
-  const point = center(index);
-  return Number(isWalkable(point.x, point.y, 6));
-});
 const offsets = neighbors.map(([dx, dy]) => dx + dy * columns);
-const edges = Uint8Array.from(passable, (free, index) => {
-  if (!free) return 0;
-  const { x, y } = center(index);
-  let mask = 0;
-  for (let i = 0; i < neighbors.length; i++) {
-    const [dx, dy] = neighbors[i];
-    if (passable[index + offsets[i]] && isWalkable(x + dx * tile / 2, y + dy * tile / 2, 6)) mask |= 1 << i;
+const passable = new Uint8Array(columns * rows);
+const edges = new Uint8Array(passable.length);
+let gridRevision = -1;
+
+function updateGrid() {
+  if (gridRevision === workstationRevision) return;
+  for (let index = 0; index < passable.length; index++) {
+    const { x, y } = center(index);
+    passable[index] = Number(isWalkable(x, y, 6));
   }
-  return mask;
-});
+  edges.fill(0);
+  for (let index = 0; index < passable.length; index++) {
+    if (!passable[index]) continue;
+    const { x, y } = center(index);
+    for (let i = 0; i < neighbors.length; i++) {
+      const [dx, dy] = neighbors[i];
+      if (passable[index + offsets[i]] && isWalkable(x + dx * tile / 2, y + dy * tile / 2, 6)) edges[index] |= 1 << i;
+    }
+  }
+  gridRevision = workstationRevision;
+}
 
 function center(index) {
   return { x: (index % columns + 0.5) * tile, y: (Math.floor(index / columns) + 0.5) * tile };
 }
 
 export function nearestCell(x, y) {
+  updateGrid();
   const column = Math.floor(x / tile);
   const row = Math.floor(y / tile);
   let best = -1;
@@ -48,6 +56,7 @@ export function nearestCell(x, y) {
 }
 
 export function makeField(start) {
+  updateGrid();
   const parent = new Int32Array(passable.length).fill(-1);
   if (start < 0) return parent;
 
@@ -65,6 +74,16 @@ export function makeField(start) {
     }
   }
   return parent;
+}
+
+export function fieldFor(cache, target) {
+  const cell = nearestCell(target.x, target.y);
+  if (cache.targetCell !== cell || cache.fieldRevision !== workstationRevision) {
+    cache.targetCell = cell;
+    cache.fieldRevision = workstationRevision;
+    cache.field = makeField(cell);
+  }
+  return cache.field;
 }
 
 export function clearPath(body, target, radius = body.radius) {
@@ -94,8 +113,7 @@ export function pursue(body, target, field, distance) {
   return moveBody(body, dx * speed, dy * speed);
 }
 
-const doorCell = nearestCell(door.x, door.y);
-const doorField = makeField(doorCell);
+const doorRoute = {};
 const exitY = height + 28;
 
 export function exitDistance(actor) {
@@ -103,6 +121,8 @@ export function exitDistance(actor) {
   if (actor.phase === "exit") return Math.max(0, exitY - actor.y);
   if (clearPath(actor, door)) return Math.hypot(door.x - actor.x, door.y - actor.y) + outside;
 
+  const doorField = fieldFor(doorRoute, door);
+  const doorCell = doorRoute.targetCell;
   let cell = nearestCell(actor.x, actor.y);
   if (cell < 0 || doorField[cell] < 0) return Math.hypot(door.x - actor.x, door.y - actor.y) + outside;
   const start = center(cell);
@@ -115,7 +135,7 @@ export function exitDistance(actor) {
 export function walkOut(actor, elapsed, speed) {
   if (actor.phase === "door") {
     if (Math.hypot(actor.x - door.x, actor.y - door.y) >= 8) {
-      if (pursue(actor, door, doorField, speed * elapsed)) actor.stride += elapsed * 11;
+      if (pursue(actor, door, fieldFor(doorRoute, door), speed * elapsed)) actor.stride += elapsed * 11;
       return false;
     }
     actor.x = door.x;

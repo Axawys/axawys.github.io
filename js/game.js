@@ -50,9 +50,10 @@ action.state.medal = achievements.has(finaleAchievement.event);
 const terminal = createTerminal(stations, systems, {
   opsec: action.opsec,
   onMaintenance(task, station, event) {
+    if (!action.trigger(event, station, renderer.camera)) return false;
     taskRows.get(task).classList.add("done");
-    if (event !== "opsec") action.trigger(event, station, renderer.camera);
     if (task.achievement) achievements.unlock(task);
+    return true;
   },
 });
 
@@ -193,7 +194,7 @@ function gamePaused() {
 
 function interact() {
   if (action.state.dead || gamePaused()) return false;
-  const target = nearestInteraction(notes, action.state.tokenComputerUsed);
+  const target = nearestInteraction(notes);
   if (!target) return false;
 
   resetInput();
@@ -243,7 +244,7 @@ function resetInput() {
 }
 
 function updateInteraction(paused) {
-  const target = paused || action.state.dead ? undefined : nearestInteraction(notes, action.state.tokenComputerUsed);
+  const target = paused || action.state.dead ? undefined : nearestInteraction(notes);
   const below = target?.kind === "note" || target?.kind === "kiosk" || target?.kind === "token-pc";
   if (target !== nearby) {
     nearby = target;

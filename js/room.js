@@ -126,13 +126,24 @@ const furniture = [
 ];
 
 const obstacles = [
-  tokenComputer.box,
-  ...furniture.map(({ box: bounds }) => bounds),
-  ...stations.flatMap(({ x, y }) => [
-    [x - 34, y - 4, x + 34, y + 20],
-    [x - 8, y + 20, x + 8, y + 34],
-  ]),
+  { station: tokenComputer, bounds: tokenComputer.box },
+  ...furniture.map(({ box: bounds }) => ({ bounds })),
+  ...stations.flatMap(station => {
+    const { x, y } = station;
+    return [
+      { station, bounds: [x - 34, y - 4, x + 34, y + 20] },
+      { station, bounds: [x - 8, y + 20, x + 8, y + 34] },
+    ];
+  }),
 ];
+export let workstationRevision = 0;
+
+export function removeWorkstation(station) {
+  if (!station || station.offline) return;
+  station.offline = true;
+  station.busy = false;
+  workstationRevision++;
+}
 
 const fixedLayers = [
   ...furniture.filter(prop => prop.kind !== "server")
@@ -142,8 +153,8 @@ const fixedLayers = [
 export function isWalkable(x, y, radius = 4, ignoredObstacle) {
   return x - radius >= floor.left && x + radius <= floor.right
     && y - radius >= floor.top && y + radius <= floor.bottom
-    && !obstacles.some(bounds => {
-      if (bounds === ignoredObstacle) return false;
+    && !obstacles.some(({ station, bounds }) => {
+      if (station?.offline || bounds === ignoredObstacle) return false;
       const [left, top, right, bottom] = bounds;
       return x + radius > left && x - radius < right && y + radius > top && y - radius < bottom;
     });
@@ -183,9 +194,9 @@ export function movePlayer(dx, dy, elapsed) {
   if (player.moving) player.stride += elapsed;
 }
 
-export function nearestInteraction(notes, tokenComputerUsed) {
-  return notes.find(note => Math.hypot(player.x - note.x, player.y - note.y) < 23)
-    ?? (!tokenComputerUsed && Math.abs(player.x - tokenComputer.x) <= 35
+export function nearestInteraction(notes) {
+  return notes.find(note => !note.station?.offline && Math.hypot(player.x - note.x, player.y - note.y) < 23)
+    ?? (!tokenComputer.offline && Math.abs(player.x - tokenComputer.x) <= 35
       && player.y >= tokenComputer.y + 20 && player.y <= tokenComputer.y + 47 ? tokenComputer : undefined)
     ?? kiosks.find(kiosk => Math.abs(player.x - kiosk.x) <= 27 && player.y >= kiosk.y + 13 && player.y <= kiosk.y + 36)
     ?? stations.find(station => !station.offline && !station.busy && Math.abs(player.x - station.x) <= 29
@@ -279,17 +290,20 @@ export function createRenderer(canvas) {
     }
     const layers = [...fixedLayers];
     for (const station of stations) {
+      if (station.offline) continue;
       const hot = action.pending.some(event => event.station === station && event.phase);
       layers.push({
         depth: station.y + 30,
         draw: () => drawDesk(context, station, station === nearby, visited.has(station.number), time * 1000, hot),
       });
     }
-    for (const note of notes) layers.push({ depth: note.y, draw: () => drawNote(context, note, nearby === note) });
+    for (const note of notes) {
+      if (!note.station?.offline) layers.push({ depth: note.y, draw: () => drawNote(context, note, nearby === note) });
+    }
     for (const supply of action.supplies) layers.push({ depth: supply.y, draw: () => drawSupply(context, supply) });
     for (const drop of action.currencyDrops) layers.push({ depth: drop.y, draw: () => drawCurrencyDrop(context, drop, time) });
-    layers.push({
-      depth: tokenComputer.box[3], draw: () => drawTokenComputer(context, action.tokens, action.tokenComputerUsed),
+    if (!tokenComputer.offline) layers.push({
+      depth: tokenComputer.box[3], draw: () => drawTokenComputer(context, action.tokens),
     });
     for (const server of action.servers) layers.push({ depth: server.box[3], draw: () => {
       drawFurniture(context, server, time * 1000);
@@ -459,7 +473,7 @@ function drawStationZone(ctx, { x, y, screen }) {
     box(ctx, corner, right - 6, edgeY, 7, 1);
   }
 }
-function drawDesk(ctx, { number, id, x, y, screen, offline }, near, discovered, time, hot) {
+function drawDesk(ctx, { number, id, x, y, screen }, near, discovered, time, hot) {
   box(ctx, "#13261db0", x - 33, y + 10, 70, 21);
   box(ctx, "#142820", x - 32, y + 14, 6, 12);
   box(ctx, "#405b4e", x - 31, y + 16, 3, 9);
@@ -474,36 +488,30 @@ function drawDesk(ctx, { number, id, x, y, screen, offline }, near, discovered, 
   box(ctx, "#273c32", x - 33, y + 15, 66, 5);
   box(ctx, "#314c3e", x - 30, y + 16, 25, 2);
 
-  if (!offline) {
-    // CRT case, screen and reflections.
-    box(ctx, "#283e34", x - 14, y + 6, 30, 5);
-    box(ctx, "#1b2b23", x - 16, y - 15, 32, 23);
-    const casing = hot ? "#bc443e" : near ? "#9ebaaa" : "#6a8b7e";
-    const phosphor = hot ? "#ffb3a0" : screen;
-    box(ctx, casing, x - 15, y - 16, 30, 20);
-    box(ctx, hot ? "#793230" : "#3d5a4f", x - 15, y + 2, 30, 5);
-    box(ctx, hot ? "#f98d77" : "#a0b4a8", x - 13, y - 15, 25, 1);
-    box(ctx, hot ? "#4c211f" : "#172a23", x - 11, y - 13, 22, 14);
-    box(ctx, hot ? "#8c302d" : "#254739", x - 9, y - 11, 18, 10);
-    box(ctx, phosphor, x - 7, y - 9, 2, 1);
-    box(ctx, phosphor, x - 5, y - 8, 1, 1);
-    box(ctx, phosphor, x - 7, y - 7, 2, 1);
-    if (time % 1100 < 700) box(ctx, phosphor, x - 3, y - 6, 3, 1);
-    box(ctx, hot ? "#d45a4d" : "#426f57", x + 2, y - 3, 6, 1);
-    box(ctx, discovered && !hot ? "#baffbe" : phosphor, x + 10, y + 4, 2, 1);
+  // CRT case, screen and reflections.
+  box(ctx, "#283e34", x - 14, y + 6, 30, 5);
+  box(ctx, "#1b2b23", x - 16, y - 15, 32, 23);
+  const casing = hot ? "#bc443e" : near ? "#9ebaaa" : "#6a8b7e";
+  const phosphor = hot ? "#ffb3a0" : screen;
+  box(ctx, casing, x - 15, y - 16, 30, 20);
+  box(ctx, hot ? "#793230" : "#3d5a4f", x - 15, y + 2, 30, 5);
+  box(ctx, hot ? "#f98d77" : "#a0b4a8", x - 13, y - 15, 25, 1);
+  box(ctx, hot ? "#4c211f" : "#172a23", x - 11, y - 13, 22, 14);
+  box(ctx, hot ? "#8c302d" : "#254739", x - 9, y - 11, 18, 10);
+  box(ctx, phosphor, x - 7, y - 9, 2, 1);
+  box(ctx, phosphor, x - 5, y - 8, 1, 1);
+  box(ctx, phosphor, x - 7, y - 7, 2, 1);
+  if (time % 1100 < 700) box(ctx, phosphor, x - 3, y - 6, 3, 1);
+  box(ctx, hot ? "#d45a4d" : "#426f57", x + 2, y - 3, 6, 1);
+  box(ctx, discovered && !hot ? "#baffbe" : phosphor, x + 10, y + 4, 2, 1);
 
-    // Tower case and status light.
-    const tower = x + (number % 2 ? 20 : -29);
-    box(ctx, "#202e29", tower - 1, y - 3, 11, 14);
-    box(ctx, hot ? "#9c3f36" : "#53685d", tower, y - 5, 9, 13);
-    box(ctx, hot ? "#793230" : "#3a5147", tower + 1, y, 7, 9);
-    box(ctx, "#202f27", tower + 2, y + 1, 5, 2);
-    box(ctx, hot ? phosphor : "#91dfa8", tower + 2, y + 5, 1, 1);
-  } else {
-    box(ctx, "#27382f", x - 14, y - 4, 28, 10);
-    box(ctx, "#354c3e", x - 9, y - 2, 19, 6);
-    box(ctx, "#644735", x + 2, y + 2, 8, 3);
-  }
+  // Tower case and status light.
+  const tower = x + (number % 2 ? 20 : -29);
+  box(ctx, "#202e29", tower - 1, y - 3, 11, 14);
+  box(ctx, hot ? "#9c3f36" : "#53685d", tower, y - 5, 9, 13);
+  box(ctx, hot ? "#793230" : "#3a5147", tower + 1, y, 7, 9);
+  box(ctx, "#202f27", tower + 2, y + 1, 5, 2);
+  box(ctx, hot ? phosphor : "#91dfa8", tower + 2, y + 5, 1, 1);
   box(ctx, "#23362d", x - 10, y + 9, 21, 5);
   box(ctx, "#a2b3a5", x - 9, y + 9, 19, 3);
   for (let key = x - 8; key < x + 9; key += 3) box(ctx, "#586e61", key, y + 10, 1, 1);
@@ -520,19 +528,13 @@ function drawDesk(ctx, { number, id, x, y, screen, offline }, near, discovered, 
 }
 
 
-function drawTokenComputer(ctx, tokens, used) {
+function drawTokenComputer(ctx, tokens) {
   const { x, y, cost } = tokenComputer;
   box(ctx, "#18271eae", x - 41, y + 11, 85, 10);
   box(ctx, "#1d2824", x - 38, y - 7, 76, 24);
   box(ctx, "#536863", x - 34, y - 7, 68, 10);
   box(ctx, "#314641", x - 34, y + 3, 68, 9);
   box(ctx, "#435751", x - 5, y + 5, 10, 3);
-  if (used) {
-    box(ctx, "#2a3533", x - 19, y - 6, 38, 7);
-    box(ctx, "#8fa6a0", x - 12, y - 5, 4, 2);
-    box(ctx, "#7b8f83", x + 8, y - 4, 6, 1);
-    return;
-  }
 
   box(ctx, "#2d2940", x - 26, y - 29, 52, 29);
   box(ctx, "#9184a6", x - 25, y - 28, 50, 3);

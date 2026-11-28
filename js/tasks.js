@@ -5,7 +5,7 @@ export const tasks = [
     system: "ALT Linux", title: "На ALT Linux после su - выполнить одну из двух команд",
     noteTitle: "Установить впн или гигакод на альт",
     command: "apt-get install vpn", setup: "su -", event: "walker", achievement: "Вы потревожили РКН",
-    alternative: { command: "apt-get install gigacode", event: "gigacode", once: true },
+    alternative: { command: "apt-get install gigacode", event: "gigacode" },
   },
   { system: "Fedora", title: "Обновить Fedora", command: "sudo dnf upgrade", event: "visitor", achievement: "Ядро в порядке" },
   {
@@ -16,7 +16,7 @@ export const tasks = [
     system: "NixOS", title: "Выполнить одну из двух команд на NixOS",
     noteTitle: "Удалить nix или обновиться",
     command: "sudo rm -rf /nix/store", event: "furry", achievement: "Пушистая ярость",
-    alternative: { command: "sudo nixos-rebuild switch --upgrade", event: "ally", once: true },
+    alternative: { command: "sudo nixos-rebuild switch --upgrade", event: "ally" },
   },
   { system: "Debian", title: "Обновить Debian", command: "sudo apt update && sudo apt upgrade", event: "elder" },
   { system: "Kali Linux", title: "Провести пентест", command: "sudo apt install opsec", event: "opsec" },

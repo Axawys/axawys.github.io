@@ -1,6 +1,6 @@
-import { height, isWalkable, moveBody, nearFree, networkRacks, player, playerStart, supplySpots, tokenComputer, tokenSpots, width } from "./room.js";
+import { height, isWalkable, moveBody, nearFree, networkRacks, player, playerStart, removeWorkstation, supplySpots, tokenComputer, tokenSpots, width } from "./room.js";
 import { createHostileFire } from "./hostile-fire.js";
-import { clearPath, makeField, nearestCell, pursue, walkOut } from "./navigation.js";
+import { clearPath, fieldFor, pursue, walkOut } from "./navigation.js";
 import { createVisitors } from "./visitors.js";
 import { createWeapons, weapons } from "./weapons.js";
 
@@ -63,7 +63,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     time: 0, aim: { x: player.x, y: player.y - 48, visible: false },
     robots: [], particles: [], shocks: [], shots: [], projectiles: [], pending: [], visitors: [], handshake: null, allies: [],
     hostileBullets: [], hostileRockets: [],
-    coins: 0, tokens: 0, tokenComputerUsed: false,
+    coins: 0, tokens: 0,
     currencyDrops: tokenSpots.map(spot => ({ ...spot, currency: "tokens", fromX: spot.x, fromY: spot.y, landedAt: 0 })),
     servers: networkRacks.map(rack => ({ ...rack, hp: serverHp, maxHp: serverHp, eye: 9, color: "#80aba5", tokensDropped: 0 })),
     supplies: supplySpots.map(spot => {
@@ -78,11 +78,9 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     get armed() { return weaponsUnlocked && !this.dead; },
   };
   let reviveIn = 0;
-  let conversionUsed = false;
   const arsenal = createWeapons(state, player, burst, shock, damageAlly, dropRobotLoot, dropServerTokens);
   const hostileFire = createHostileFire(state, player, hitPlayer, burst, shock);
-  let playerCell = -1;
-  let playerField;
+  const playerRoute = {};
   const visitors = createVisitors(state, { hitPlayer, onNotice, burst });
 
   function burst(x, y, colors, count, force, smoke = false) {
@@ -137,7 +135,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
   }
 
   function activateTokenComputer() {
-    if (state.tokenComputerUsed || state.dead) return;
+    if (tokenComputer.offline || state.dead) return;
     const { x, y, cost } = tokenComputer;
     if (state.tokens < cost) {
       onNotice("Для запуска нужно ещё " + (cost - state.tokens) + " токенов");
@@ -147,7 +145,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     if (!point) return;
 
     state.tokens -= cost;
-    state.tokenComputerUsed = true;
+    removeWorkstation(tokenComputer);
     const hp = robotTypes.agent.maxHp;
     state.allies.push({
       ...point, kind: "crutch", name: "Робот из костылей", color: allyColor, radius: 6, hp, maxHp: hp,
@@ -161,10 +159,9 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
 
   const opsec = {
     get targets() { return state.robots.filter(robot => !visitors.isFleeing(robot)); },
-    get conversionUsed() { return conversionUsed; },
     convert(robot) {
       const index = state.robots.indexOf(robot);
-      if (conversionUsed || index < 0 || visitors.isFleeing(robot)) return false;
+      if (index < 0 || visitors.isFleeing(robot)) return false;
       const { kind, name, x, y, radius, stride } = robot;
       const maxHp = robot.reviveAt ? robot.maxHp * 2 : robot.maxHp;
       state.robots.splice(index, 1);
@@ -173,7 +170,6 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
         color: allyColor, phase: "guard", robotPhase: robot.reviveAt ? 2 : robot.phase,
         side: x <= player.x ? -1 : 1, nextAttack: state.time,
       });
-      conversionUsed = true;
       shock(x, y - 5, 23, allyColor, 0.32);
       burst(x, y - robot.eye, [allyColor, "#e0f8d8"], 16, 66);
       onNotice(name + " теперь на вашей стороне");
@@ -255,16 +251,22 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
   }
 
   function trigger(event, station, view) {
+    if (station?.offline || station?.busy) return false;
+    if (event === "opsec") {
+      removeWorkstation(station);
+      return true;
+    }
     if (event === "arch-outfit") {
+      removeWorkstation(station);
       state.outfitRemaining = outfitDuration;
       onNotice("Кошачьи ушки и чулки · 30 секунд");
-      return;
+      return true;
     }
     const allyType = allyTypes[event];
     if (allyType) {
-      if (state.allies.some(ally => ally.name === allyType.name)) return;
       const point = nearFree(station.x + allyType.side * 25, station.y + 45, 6) ?? nearFree(player.x, player.y, 6);
-      if (!point) return;
+      if (!point) return false;
+      removeWorkstation(station);
       state.allies.push({
         ...point, ...allyType, color: allyColor, radius: 6, hp: allyType.maxHp,
         stride: 0, phase: "guard", remaining: allyDuration, nextAttack: state.time,
@@ -272,11 +274,12 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
       state.coins += allyGift;
       burst(point.x, point.y - 12, [allyColor, "#e0f8d8"], 16, 66);
       onNotice(allyType.name + " пришёл на помощь · +" + allyGift + " монет");
-      return;
+      return true;
     }
     if (event === "visitor" || event === "elder") {
-      visitors.call(event, view);
-      return;
+      if (!visitors.call(event, view)) return false;
+      removeWorkstation(station);
+      return true;
     }
     station.busy = true;
     if (event === "explosion") {
@@ -287,10 +290,11 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     } else {
       state.pending.push({ event, station, remaining: 0.32 });
     }
+    return true;
   }
 
   function finishEvent({ event, station, blast }) {
-    station.offline = true;
+    removeWorkstation(station);
     const { x, y } = station;
     if (event === "explosion") {
       shock(blast.x, blast.y, blast.radius, "#ffb86b", 0.67);
@@ -352,20 +356,16 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
   }
 
   function moveAlly(ally, target, elapsed) {
-    const cell = nearestCell(target.x, target.y);
-    if (ally.targetCell !== cell) {
-      ally.targetCell = cell;
-      ally.field = makeField(cell);
-    }
-    if (pursue(ally, target, ally.field, allySpeed * elapsed)) ally.stride += elapsed * 13;
+    if (pursue(ally, target, fieldFor(ally, target), allySpeed * elapsed)) ally.stride += elapsed * 13;
   }
 
   function repairNetwork(ally, elapsed) {
+    if (ally.repair && ally.repair.server.hp === ally.repair.server.maxHp) delete ally.repair;
     if (!ally.repair) {
       let nearest;
       let gap = Infinity;
       for (const server of state.servers) {
-        if (server.hp === server.maxHp) continue;
+        if (server.hp === server.maxHp || state.allies.some(other => other.phase === "guard" && other.repair?.server === server)) continue;
         const point = { x: server.x, y: server.box[3] + ally.radius + 2 };
         const distance = Math.hypot(point.x - ally.x, point.y - ally.y);
         if (distance < gap) {
@@ -427,15 +427,6 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     if (target) moveAlly(ally, target, elapsed);
   }
 
-  function fieldTowardPlayer({ x, y }) {
-    const cell = nearestCell(x, y);
-    if (cell !== playerCell || !playerField) {
-      playerCell = cell;
-      playerField = makeField(cell);
-    }
-    return playerField;
-  }
-
   function attackAlly(robot, ally) {
     if (state.time < (robot.nextAllyAttack ?? 0)) return;
     robot.nextAllyAttack = state.time + 0.65;
@@ -477,7 +468,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
   }
 
   function advanceRobots(elapsed) {
-    const field = fieldTowardPlayer(player);
+    const field = fieldFor(playerRoute, player);
     const cannotMove = robot => robot.reviveAt || robot.frozenUntil > state.time || visitors.isFleeing(robot);
     for (const robot of state.robots) {
       if (cannotMove(robot) || state.time < robot.ready) continue;

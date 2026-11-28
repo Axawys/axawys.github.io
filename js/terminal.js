@@ -11,9 +11,10 @@ export function createTerminal(stations, systems, { onMaintenance, opsec }) {
   const form = byId("terminal-form");
   const input = byId("command");
   const promptLabel = byId("prompt");
+  const leaveButton = byId("leave");
+  const clearButton = byId("clear-terminal");
   const fastfetchButton = byId("run-fastfetch");
   const visited = new Set();
-  const usedCommands = new Set();
   let active;
   let selection;
   let fetchRuns = 0;
@@ -26,7 +27,7 @@ export function createTerminal(stations, systems, { onMaintenance, opsec }) {
     const command = document.createElement("code");
     command.textContent = "fastfetch";
     intro.append("Введите ", command, ", чтобы посмотреть сведения о системе.");
-    return { id, system, station, lines: [intro], history: [], cursor: 0, draft: "", root: false, completed: false };
+    return { id, system, station, lines: [intro], history: [], cursor: 0, draft: "", root: false };
   });
 
   function prompt() {
@@ -39,12 +40,19 @@ export function createTerminal(stations, systems, { onMaintenance, opsec }) {
     terminal.scrollTop = terminal.scrollHeight;
   }
 
+  function setInputAvailable(available) {
+    form.hidden = !available;
+    fastfetchButton.disabled = !available;
+  }
+
   function open(station) {
-    if (active || station.offline) return;
+    if (active || station.offline || station.busy) return;
     active = sessions[station.number - 1];
     active.cursor = active.history.length;
     active.draft = "";
     input.value = "";
+    setInputAvailable(true);
+    clearButton.disabled = false;
     byId("computer-name").textContent = active.id;
     promptLabel.textContent = prompt();
     output.replaceChildren(...active.lines);
@@ -80,6 +88,7 @@ export function createTerminal(stations, systems, { onMaintenance, opsec }) {
   }
 
   function clear() {
+    if (active.station.offline) return;
     clearSelection();
     active.lines.length = 0;
     output.replaceChildren();
@@ -87,19 +96,23 @@ export function createTerminal(stations, systems, { onMaintenance, opsec }) {
   }
 
   function complete(task, option, closeTerminal = true) {
-    active.completed = true;
-    if (option.once) usedCommands.add(option.command);
-    const station = active.station;
-    if (closeTerminal) close();
-    onMaintenance(task, station, option.event);
+    if (!onMaintenance(task, active.station, option.event)) return false;
+    if (closeTerminal) {
+      close();
+    } else {
+      setInputAvailable(false);
+      clearButton.disabled = true;
+      leaveButton.focus({ preventScroll: true });
+      terminal.scrollTop = terminal.scrollHeight;
+    }
+    return true;
   }
 
   function clearSelection() {
     if (!selection) return;
     selection.group.remove();
     selection = undefined;
-    form.hidden = false;
-    fastfetchButton.disabled = false;
+    setInputAvailable(true);
   }
 
   function runOpsec(task) {
@@ -110,11 +123,6 @@ export function createTerminal(stations, systems, { onMaintenance, opsec }) {
       complete(task, task, false);
       return;
     }
-    if (opsec.conversionUsed) {
-      print("Один противник уже перешёл на вашу сторону.");
-      return;
-    }
-
     const group = document.createElement("div");
     const instructions = document.createElement("p");
     const list = document.createElement("div");
@@ -131,16 +139,14 @@ export function createTerminal(stations, systems, { onMaintenance, opsec }) {
         if (!opsec.convert(robot)) return;
         clearSelection();
         print(robot.name + " теперь на вашей стороне.");
-        complete(task, task, false);
-        focus();
+        if (!complete(task, task, false)) focus();
       });
       return button;
     });
     list.append(...buttons);
     group.append(instructions, list);
     selection = { group, buttons };
-    form.hidden = true;
-    fastfetchButton.disabled = true;
+    setInputAvailable(false);
     output.append(group);
     buttons[0].focus();
   }
@@ -153,10 +159,6 @@ export function createTerminal(stations, systems, { onMaintenance, opsec }) {
       print("Эта операция предназначена для " + task.system + ".");
     } else if (task.setup && !active.root) {
       print("E: Недостаточно прав. Сначала выполните su -.");
-    } else if (option.once && usedCommands.has(command)) {
-      print("Этого союзника можно вызвать только один раз за игру.");
-    } else if (active.completed) {
-      print("Ничего не изменилось. Задание уже выполнено.");
     } else if (option.event === "opsec") {
       runOpsec(task);
     } else {
@@ -166,7 +168,7 @@ export function createTerminal(stations, systems, { onMaintenance, opsec }) {
   }
 
   function execute(command) {
-    if (selection) return;
+    if (selection || active.station.offline) return;
     const text = command.trim();
     input.value = "";
     if (!text) {
@@ -205,7 +207,7 @@ export function createTerminal(stations, systems, { onMaintenance, opsec }) {
         if (active.system.name === fetchTask.system && fetchRuns < fetchTask.repeats) {
           fetchRuns++;
           print(fetchTask.title + " · " + fetchRuns + "/" + fetchTask.repeats);
-          if (fetchRuns === fetchTask.repeats) complete(fetchTask, fetchTask, false);
+          if (fetchRuns === fetchTask.repeats && complete(fetchTask, fetchTask, false)) fetchRuns = 0;
         }
         break;
       case "whoami":
@@ -228,10 +230,11 @@ export function createTerminal(stations, systems, { onMaintenance, opsec }) {
       default:
         if (!maintenance(normalized)) print("bash: " + normalized.split(" ", 1)[0] + ": command not found");
     }
-    if (active && !selection) focus();
+    if (active && !selection && !active.station.offline) focus();
   }
 
   function handleKey(event) {
+    if (active.station.offline) return;
     if (event.ctrlKey && event.code === "KeyL") {
       event.preventDefault();
       clear();
@@ -256,8 +259,8 @@ export function createTerminal(stations, systems, { onMaintenance, opsec }) {
     }
   }
 
-  byId("leave").addEventListener("click", close);
-  byId("clear-terminal").addEventListener("click", clear);
+  leaveButton.addEventListener("click", close);
+  clearButton.addEventListener("click", clear);
   fastfetchButton.addEventListener("click", () => execute("fastfetch"));
   dialog.addEventListener("cancel", event => {
     event.preventDefault();

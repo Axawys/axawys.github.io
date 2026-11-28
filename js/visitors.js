@@ -1,4 +1,4 @@
-import { clearPath, exitDistance, makeField, nearestCell, pursue, walkOut } from "./navigation.js";
+import { clearPath, exitDistance, fieldFor, makeField, nearestCell, pursue, walkOut } from "./navigation.js";
 import { door, isWalkable, nearFree, player } from "./room.js";
 
 const visitDuration = 10;
@@ -49,25 +49,21 @@ export function createVisitors(state, { hitPlayer, onNotice, burst }) {
       visitor.damage = state.outfitRemaining > 0 ? 25 : 1;
     }
     state.visitors.push(visitor);
-    if (kind !== "elder" || state.handshake) return;
+    if (kind !== "elder" || state.handshake) return visitor;
 
     const linus = state.visitors.find(actor => actor.kind === "visitor" && !actor.metElder);
-    if (!linus) return;
+    if (!linus) return visitor;
     if (linus.phase === "exit") Object.assign(linus, door);
     linus.phase = visitor.phase = "meeting";
     const [left, right] = handshakePlaces(nearFree(player.x + 45, player.y + 12, 6) ?? target);
     const [linusTarget, elderTarget] = linus.x <= visitor.x ? [left, right] : [right, left];
     state.handshake = { linus, elder: visitor, linusTarget, elderTarget };
+    return visitor;
   }
 
   function follow(actor, target, elapsed, speed) {
     actor.facingX = target.x;
-    const cell = nearestCell(target.x, target.y);
-    if (actor.targetCell !== cell) {
-      actor.targetCell = cell;
-      actor.field = makeField(cell);
-    }
-    if (pursue(actor, target, actor.field, speed * elapsed)) actor.stride += elapsed * 11;
+    if (pursue(actor, target, fieldFor(actor, target), speed * elapsed)) actor.stride += elapsed * 11;
   }
 
   function advanceElder(elder, elapsed) {
