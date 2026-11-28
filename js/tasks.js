@@ -19,6 +19,7 @@ export const tasks = [
     alternative: { command: "sudo nixos-rebuild switch --upgrade", event: "ally", once: true },
   },
   { system: "Debian", title: "Обновить Debian", command: "sudo apt update && sudo apt upgrade", event: "elder" },
+  { system: "Kali Linux", title: "Провести пентест", command: "sudo apt install opsec", event: "opsec" },
 ];
 
 export const finaleAchievement = { system: "Linux Lab", event: "linux-user", achievement: "Настоящий линуксоид" };

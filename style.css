@@ -157,6 +157,9 @@ kbd { display: inline-flex; align-items: center; justify-content: center; min-wi
 .terminal-intro, .terminal-line { margin-bottom: 7px; overflow-wrap: anywhere; }
 .terminal-intro { color: #acc1b0; }
 .terminal-intro code { color: #aff2bc; }
+.terminal-targets { display: grid; gap: 4px; margin-bottom: 8px; }
+.terminal-targets button { min-height: 36px; padding: 5px 8px; border: 1px solid #42644b; border-inline-start-width: 3px; color: #d2e7d5; background: #14251a; text-align: start; }
+.terminal-targets button:focus, .terminal-targets button:hover { border-color: #a8f4ba; outline: none; color: #effff2; background: #294538; }
 .terminal-result { margin: 8px 0 13px; display: flex; align-items: start; gap: 20px; }
 .fetch-logo { margin: 0; flex: 0 0 auto; color: var(--system-color); font-family: inherit; font-weight: 700; }
 .fetch-info { margin: 0; min-width: 0; }

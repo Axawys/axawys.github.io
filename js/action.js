@@ -88,6 +88,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     get armed() { return weaponsUnlocked && !this.dead; },
   };
   let reviveIn = 0;
+  let conversionUsed = false;
   const arsenal = createWeapons(state, player, burst, shock, damageAlly, dropCoins);
   const hostileFire = createHostileFire(state, player, hitPlayer, burst, shock);
   let playerCell = -1;
@@ -135,6 +136,33 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     });
     state.coins += pickedUp;
   }
+
+  const opsec = {
+    get targets() { return state.robots; },
+    get conversionUsed() { return conversionUsed; },
+    convert(robot) {
+      const index = state.robots.indexOf(robot);
+      if (conversionUsed || index < 0) return false;
+      const { kind, name, x, y, radius, stride } = robot;
+      const maxHp = robot.reviveAt ? robot.maxHp * 2 : robot.maxHp;
+      state.robots.splice(index, 1);
+      state.allies.push({
+        kind, name, x, y, radius, stride, maxHp, hp: robot.reviveAt ? maxHp : robot.hp,
+        color: allyColor, phase: "guard", robotPhase: robot.reviveAt ? 2 : robot.phase,
+        side: x <= player.x ? -1 : 1, nextAttack: state.time,
+      });
+      conversionUsed = true;
+      shock(x, y - 5, 23, allyColor, 0.32);
+      burst(x, y - robot.eye, [allyColor, "#e0f8d8"], 16, 66);
+      onNotice(name + " теперь на вашей стороне");
+      return true;
+    },
+    destroyServers() {
+      if (state.robots.length) return false;
+      for (const server of state.servers) arsenal.damageServer(server, server.hp, server.x, server.y - server.eye);
+      return true;
+    },
+  };
 
   function ammoOffer(index) {
     const weapon = weapons[index];
@@ -379,11 +407,13 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
       if (walkOut(ally, elapsed, 110)) removeAlly(ally);
       return;
     }
-    ally.remaining = Math.max(0, ally.remaining - sceneElapsed);
-    if (ally.remaining === 0) {
-      ally.phase = "door";
-      onNotice(ally.name + " уходит");
-      return;
+    if (ally.remaining !== undefined) {
+      ally.remaining = Math.max(0, ally.remaining - sceneElapsed);
+      if (ally.remaining === 0) {
+        ally.phase = "door";
+        onNotice(ally.name + " уходит");
+        return;
+      }
     }
 
     const threat = state.dead ? undefined : allyThreat(ally);
@@ -629,7 +659,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
   }
 
   return {
-    state, trigger, startCelebration, update, ammoOffer, buyAmmo, medkitOffer, buyMedkit,
+    state, opsec, trigger, startCelebration, update, ammoOffer, buyAmmo, medkitOffer, buyMedkit,
     cycleWeapon: arsenal.cycle, selectWeapon: arsenal.select,
   };
 }

@@ -45,10 +45,13 @@ const achievements = createAchievements([...achievementTasks, finaleAchievement]
 const action = createAction(showNotice, () => achievements.unlock(finaleAchievement));
 const shop = createShop(action, player, () => canvas.focus({ preventScroll: true }));
 action.state.medal = achievements.has(finaleAchievement.event);
-const terminal = createTerminal(stations, systems, (task, station, event) => {
-  taskRows.get(task).classList.add("done");
-  action.trigger(event, station, renderer.camera);
-  if (task.achievement) achievements.unlock(task);
+const terminal = createTerminal(stations, systems, {
+  opsec: action.opsec,
+  onMaintenance(task, station, event) {
+    taskRows.get(task).classList.add("done");
+    if (event !== "opsec") action.trigger(event, station, renderer.camera);
+    if (task.achievement) achievements.unlock(task);
+  },
 });
 
 const slotButtons = weapons.map((weapon, index) => {

@@ -187,6 +187,33 @@ const systems = [
       "     ▀▀█▄▄",
     ],
   },
+  {
+    name: "Kali Linux",
+    os: "Kali GNU/Linux Rolling x86_64",
+    kernel: "Linux 6.12-amd64",
+    packages: "2015 (dpkg)",
+    shell: "zsh 5.9",
+    desktop: "Xfce 4.20.4",
+    wm: "Xfwm4 (X11)",
+    terminal: "QTerminal 2.1.0",
+    host: "ThinkPad T480",
+    cpu: "Intel Core i5-8350U (8) @ 3.60 GHz",
+    gpu: "Intel UHD Graphics 620",
+    memory: "1.73 GiB / 15.40 GiB (11%)",
+    uptime: "1 hour, 8 mins",
+    color: "#86b9fa",
+    logo: [
+      "    ▄▄▄███▀▀▀ ▄▄",
+      "  ▄██▀▀     ▄██▀",
+      " ▄█▀   ▄▄▄██▀ ▀█▄",
+      " █▌  ▄██▀ ▀▀▀▄  ▀",
+      " ▀██▄▄▀██▄",
+      "   ▀▀█▄▄▀██▄▄",
+      " ▀▄▄    ▀▀████▄",
+      "   ▀▀██▄▄▄▄ ██▀",
+      "        ▀▀▀▀▀",
+    ],
+  },
 ];
 
 const pentium4 = {

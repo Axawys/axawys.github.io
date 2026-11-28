@@ -3,16 +3,18 @@ import { tasks } from "./tasks.js";
 
 const byId = id => document.getElementById(id);
 
-export function createTerminal(stations, systems, onMaintenance) {
+export function createTerminal(stations, systems, { onMaintenance, opsec }) {
   const dialog = byId("computer");
   const terminal = byId("terminal-screen");
   const output = byId("terminal-output");
   const form = byId("terminal-form");
   const input = byId("command");
   const promptLabel = byId("prompt");
+  const fastfetchButton = byId("run-fastfetch");
   const visited = new Set();
   const usedCommands = new Set();
   let active;
+  let selection;
 
   const sessions = stations.map((station, index) => {
     const system = systems[index];
@@ -50,6 +52,7 @@ export function createTerminal(stations, systems, onMaintenance) {
 
   function close() {
     if (!active) return;
+    clearSelection();
     active = undefined;
     dialog.close();
     byId("room").focus({ preventScroll: true });
@@ -75,9 +78,69 @@ export function createTerminal(stations, systems, onMaintenance) {
   }
 
   function clear() {
+    clearSelection();
     active.lines.length = 0;
     output.replaceChildren();
     focus();
+  }
+
+  function complete(task, option, closeTerminal = true) {
+    active.completed = true;
+    if (option.once) usedCommands.add(option.command);
+    const station = active.station;
+    if (closeTerminal) close();
+    onMaintenance(task, station, option.event);
+  }
+
+  function clearSelection() {
+    if (!selection) return;
+    selection.group.remove();
+    selection = undefined;
+    form.hidden = false;
+    fastfetchButton.disabled = false;
+  }
+
+  function runOpsec(task) {
+    const targets = opsec.targets;
+    if (!targets.length) {
+      opsec.destroyServers();
+      print("взлом датацентров, успех");
+      complete(task, task, false);
+      return;
+    }
+    if (opsec.conversionUsed) {
+      print("Один противник уже перешёл на вашу сторону.");
+      return;
+    }
+
+    const group = document.createElement("div");
+    const instructions = document.createElement("p");
+    const list = document.createElement("div");
+    instructions.className = "terminal-line";
+    instructions.textContent = "Выберите робота стрелками ↑ и ↓ и нажмите Enter или коснитесь строки.";
+    list.className = "terminal-targets";
+    list.setAttribute("role", "group");
+    list.setAttribute("aria-label", "Враждебные роботы");
+    const buttons = targets.map(robot => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = robot.name + " · " + (robot.reviveAt ? "перезапуск" : robot.hp + " HP");
+      button.addEventListener("click", () => {
+        if (!opsec.convert(robot)) return;
+        clearSelection();
+        print(robot.name + " теперь на вашей стороне.");
+        complete(task, task, false);
+        focus();
+      });
+      return button;
+    });
+    list.append(...buttons);
+    group.append(instructions, list);
+    selection = { group, buttons };
+    form.hidden = true;
+    fastfetchButton.disabled = true;
+    output.append(group);
+    buttons[0].focus();
   }
 
   function maintenance(command) {
@@ -92,17 +155,16 @@ export function createTerminal(stations, systems, onMaintenance) {
       print("Этого союзника можно вызвать только один раз за игру.");
     } else if (active.completed) {
       print("Ничего не изменилось. Задание уже выполнено.");
+    } else if (option.event === "opsec") {
+      runOpsec(task);
     } else {
-      active.completed = true;
-      if (option.once) usedCommands.add(command);
-      const station = active.station;
-      close();
-      onMaintenance(task, station, option.event);
+      complete(task, option);
     }
     return true;
   }
 
   function execute(command) {
+    if (selection) return;
     const text = command.trim();
     input.value = "";
     if (!text) {
@@ -159,13 +221,23 @@ export function createTerminal(stations, systems, onMaintenance) {
       default:
         if (!maintenance(normalized)) print("bash: " + normalized.split(" ", 1)[0] + ": command not found");
     }
-    if (active) focus();
+    if (active && !selection) focus();
   }
 
   function handleKey(event) {
     if (event.ctrlKey && event.code === "KeyL") {
       event.preventDefault();
       clear();
+    } else if (selection && ["ArrowUp", "ArrowDown"].includes(event.code)) {
+      event.preventDefault();
+      const { buttons } = selection;
+      const current = buttons.indexOf(document.activeElement);
+      const direction = event.code === "ArrowUp" ? -1 : 1;
+      const next = current < 0 ? 0 : (current + direction + buttons.length) % buttons.length;
+      buttons[next].focus();
+    } else if (selection && event.code === "Enter" && selection.buttons.includes(event.target)) {
+      event.preventDefault();
+      if (!event.repeat) event.target.click();
     } else if (event.target === input && ["ArrowUp", "ArrowDown"].includes(event.code)) {
       event.preventDefault();
       const { history, cursor } = active;
@@ -179,7 +251,7 @@ export function createTerminal(stations, systems, onMaintenance) {
 
   byId("leave").addEventListener("click", close);
   byId("clear-terminal").addEventListener("click", clear);
-  byId("run-fastfetch").addEventListener("click", () => execute("fastfetch"));
+  fastfetchButton.addEventListener("click", () => execute("fastfetch"));
   dialog.addEventListener("cancel", event => {
     event.preventDefault();
     close();

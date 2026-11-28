@@ -320,9 +320,10 @@ export function drawRobot(ctx, robot, time) {
   const y = Math.round(robot.y);
   const walk = Math.sin(robot.stride * 1.2);
   const white = time < robot.flash;
+  const upgraded = (robot.robotPhase ?? robot.phase) === 2;
   if (robot.kind === "walker") {
     const leg = Math.round(walk * 3);
-    const body = white ? "#fbfff0" : robot.phase === 2 ? "#d08367" : "#c2ad73";
+    const body = white ? "#fbfff0" : upgraded ? "#d08367" : "#c2ad73";
     box(ctx, "#14221b", x - 13, y - 2, 26, 4);
     for (const side of [-1, 1]) {
       const dx = side * 7;
@@ -345,7 +346,7 @@ export function drawRobot(ctx, robot, time) {
   const agent = robot.kind === "agent";
   const size = agent ? 13 : small ? 5 : 9;
   const centerY = y - (size - 1);
-  const metal = white ? "#faf9e3" : robot.phase === 2 ? "#c68975" : small ? "#b89a78" : "#b9aca2";
+  const metal = white ? "#faf9e3" : upgraded ? "#c68975" : small ? "#b89a78" : "#b9aca2";
   const eye = agent ? robot.color : small ? "#f6a071" : "#ff7761";
   box(ctx, "#14231bd0", x - size - 4, y - 2, (size + 4) * 2, 4);
   for (const side of [-1, 1]) {
