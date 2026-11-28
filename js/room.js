@@ -14,10 +14,7 @@ export const playerStart = { x: centerX, y: breakAreaTop + 40 };
 const deskColumns = [326, 506, 686, 866];
 const deskRows = [126, 270, 414, 558, 642];
 const screens = ["#80dbc1", "#b4a6e2", "#83bedc", "#91d7ad", "#e0bd84", "#8faadd"];
-export const stations = deskRows.flatMap(y => {
-  const columns = y === deskRows.at(-1) ? deskColumns.slice(1, -1) : deskColumns;
-  return columns.map(x => ({ x, y }));
-}).map((position, index) => {
+export const stations = deskRows.flatMap(y => deskColumns.map(x => ({ x, y }))).map((position, index) => {
   const number = index + 1;
   return { ...position, number, id: "PC-" + String(number).padStart(2, "0"), screen: screens[index % screens.length], hintSide: 1 };
 });

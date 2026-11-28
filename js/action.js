@@ -252,7 +252,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
 
   function trigger(event, station, view) {
     if (station?.offline || station?.busy) return false;
-    if (event === "opsec") {
+    if (event === "opsec" || event === "windows-delete") {
       removeWorkstation(station);
       return true;
     }

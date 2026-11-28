@@ -1,6 +1,36 @@
 const storagePrefix = "linux-lab:achievement:";
 const resetStorageKey = "linux-lab:progress-reset";
 
+function catIcon() {
+  const icon = document.createElement("canvas");
+  icon.width = icon.height = 11;
+  icon.className = "achievement-cat";
+  icon.setAttribute("aria-hidden", "true");
+  const context = icon.getContext("2d");
+  const pixels = [
+    "...........",
+    ".d.......d.",
+    ".dpd...dpd.",
+    ".dppdddppd.",
+    ".dfffffffd.",
+    "dfffffffffd",
+    "dfefffffefd",
+    "dfffcpcfffd",
+    "dcffcecffcd",
+    ".ddcccccdd.",
+    "...ddddd...",
+  ];
+  const palette = { d: "#644538", p: "#eb9b9c", f: "#f6c47e", e: "#392926", c: "#ffe2a3" };
+  for (const [y, row] of pixels.entries()) {
+    for (const [x, shade] of Array.from(row).entries()) {
+      if (!palette[shade]) continue;
+      context.fillStyle = palette[shade];
+      context.fillRect(x, y, 1, 1);
+    }
+  }
+  return icon;
+}
+
 function saved(event) {
   try {
     return localStorage.getItem(storagePrefix + event) === "1";
@@ -41,6 +71,10 @@ export function createAchievements(tasks, restoreFocus) {
     card.className = "achievement-card";
     icon.className = "achievement-mark";
     icon.setAttribute("aria-hidden", "true");
+    if (task.icon === "cat") {
+      icon.classList.add("cat-mark");
+      icon.append(catIcon());
+    }
     title.textContent = task.achievement;
     system.className = "achievement-system";
     system.textContent = task.system;
@@ -75,6 +109,10 @@ export function createAchievements(tasks, restoreFocus) {
     title.textContent = task.achievement;
     tally.textContent = summary.textContent;
     details.append(title, tally);
+    if (task.icon === "cat") {
+      details.classList.add("cat-toast");
+      details.append(catIcon());
+    }
     toast.replaceChildren(details);
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => toast.replaceChildren(), 4500);

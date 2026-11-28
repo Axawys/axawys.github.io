@@ -145,5 +145,42 @@
       </footer>
     </div>
   </dialog>
+
+  <dialog id="windows-desktop" class="computer" aria-labelledby="desktop-title">
+    <div class="monitor desktop-monitor">
+      <header class="monitor-header">
+        <h2 id="desktop-title"><span class="power-light" aria-hidden="true"></span> <span id="desktop-pc-name"></span><span class="monitor-divider" aria-hidden="true">/</span><span>Windows 11</span></h2>
+        <button type="button" class="exit" id="leave-desktop" autofocus><kbd aria-hidden="true">Esc</kbd> Встать</button>
+      </header>
+      <div class="monitor-bezel">
+        <div class="desktop-screen">
+          <div class="desktop-shortcuts" role="group" aria-label="Ярлыки рабочего стола">
+            <button type="button" class="desktop-shortcut" id="desktop-this-pc" aria-pressed="false" aria-describedby="desktop-status">
+              <span class="desktop-icon icon-this-pc" aria-hidden="true"></span><span>Этот ПК</span>
+            </button>
+            <button type="button" class="desktop-shortcut" id="desktop-notepad">
+              <span class="desktop-icon icon-notepad" aria-hidden="true"></span><span>Блокнот</span>
+            </button>
+            <button type="button" class="desktop-shortcut" id="desktop-info">
+              <span class="desktop-icon icon-info" aria-hidden="true"></span><span>Сведения</span>
+            </button>
+          </div>
+          <button type="button" class="desktop-shortcut" id="desktop-trash">
+            <span class="desktop-icon icon-trash" aria-hidden="true"></span><span>Корзина</span>
+          </button>
+          <section class="desktop-panel" id="desktop-panel" aria-labelledby="desktop-panel-title" hidden>
+            <header>
+              <strong id="desktop-panel-title"></strong>
+              <button type="button" id="close-desktop-panel" aria-label="Закрыть окно">×</button>
+            </header>
+            <p id="desktop-panel-text"></p>
+          </section>
+        </div>
+      </div>
+      <footer class="desktop-footer">
+        <p id="desktop-status" role="status"></p>
+      </footer>
+    </div>
+  </dialog>
 </body>
 </html>

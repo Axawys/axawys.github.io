@@ -24,6 +24,10 @@ export const tasks = [
     system: "Arch Linux", title: "Полюбоваться фетчем", command: "fastfetch", repeats: 5, event: "arch-outfit",
     achievement: "Настоящий райсер", finale: false,
   },
+  {
+    system: "Windows 11", title: "Удалить ПК", instruction: "Перетащить «Этот ПК» в корзину", event: "windows-delete",
+    achievement: "Аче всмысле", icon: "cat", finale: false,
+  },
 ];
 
 export const finaleAchievement = { system: "Linux Lab", event: "linux-user", achievement: "Настоящий линуксоид" };

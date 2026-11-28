@@ -8,6 +8,7 @@ import { shuffleSystems } from "./systems.js";
 import { finaleAchievement, tasks } from "./tasks.js";
 import { createTerminal } from "./terminal.js";
 import { weapons } from "./weapons.js";
+import { createWindowsDesktop } from "./windows-desktop.js";
 
 const byId = id => document.getElementById(id);
 const canvas = byId("room");
@@ -47,15 +48,18 @@ const achievements = createAchievements([...achievementTasks, finaleAchievement]
 const action = createAction(showNotice, () => achievements.unlock(finaleAchievement));
 const shop = createShop(action, player, () => canvas.focus({ preventScroll: true }));
 action.state.medal = achievements.has(finaleAchievement.event);
+function completeTask(task, station, event = task.event) {
+  if (!action.trigger(event, station, renderer.camera)) return false;
+  taskRows.get(task).classList.add("done");
+  if (task.achievement) achievements.unlock(task);
+  return true;
+}
 const terminal = createTerminal(stations, systems, {
   opsec: action.opsec,
-  onMaintenance(task, station, event) {
-    if (!action.trigger(event, station, renderer.camera)) return false;
-    taskRows.get(task).classList.add("done");
-    if (task.achievement) achievements.unlock(task);
-    return true;
-  },
+  onMaintenance: completeTask,
 });
+const windowsTask = tasks.find(task => task.event === "windows-delete");
+const desktop = createWindowsDesktop(station => completeTask(windowsTask, station), () => canvas.focus({ preventScroll: true }));
 
 weaponSlots.style.setProperty("--weapon-count", weapons.length);
 const slotButtons = weapons.map((weapon, index) => {
@@ -116,6 +120,7 @@ function showNotice(message, warning = false) {
 }
 
 function commandSequence(task) {
+  if (task.instruction) return task.instruction;
   const instruction = document.createDocumentFragment();
   if (task.setup) {
     const setup = document.createElement("code");
@@ -189,7 +194,11 @@ let shotRequest;
 let interactionKeyHeld = false;
 
 function gamePaused() {
-  return controlsDialog.open || terminal.isOpen || noteDialog.open || achievements.isOpen || shop.isOpen;
+  return controlsDialog.open || terminal.isOpen || desktop.isOpen || noteDialog.open || achievements.isOpen || shop.isOpen;
+}
+
+function showsDesktop(station) {
+  return systems[station?.number - 1]?.ui === "desktop";
 }
 
 function interact() {
@@ -201,6 +210,7 @@ function interact() {
   if (target.kind === "note") openNote(target);
   else if (target.kind === "kiosk") shop.open(target.catalog);
   else if (target.kind === "token-pc") action.activateTokenComputer();
+  else if (showsDesktop(target)) desktop.open(target);
   else terminal.open(target);
   return true;
 }
@@ -215,9 +225,9 @@ function openNote(target) {
     hintCopyStatus.textContent = "";
     const commands = [hint.setup, hint.command, hint.alternative?.command].filter(Boolean);
     hintCommands.replaceChildren(...commands.map(hintCommand));
-    if (hint.repeats) {
+    if (hint.instruction || hint.repeats) {
       const instruction = document.createElement("p");
-      instruction.textContent = "Выполнить " + hint.repeats + " раз.";
+      instruction.textContent = hint.instruction ?? "Выполнить " + hint.repeats + " раз.";
       hintCommands.append(instruction);
     }
   }
@@ -252,7 +262,8 @@ function updateInteraction(paused) {
     if (target?.kind === "kiosk") {
       interactText.textContent = target.catalog === "medkits" ? "Купить аптечку" : "Купить боеприпасы";
     } else if (target?.kind !== "token-pc") {
-      interactText.textContent = target?.task ? "Читать подсказку" : target === note ? "Читать записку" : "Сесть за ПК";
+      interactText.textContent = target?.task ? "Читать подсказку" : target === note ? "Читать записку"
+        : showsDesktop(target) ? "Открыть Windows 11" : "Сесть за ПК";
     }
     interactButton.classList.toggle("below", below);
   }
@@ -296,7 +307,7 @@ window.addEventListener("keydown", event => {
     return;
   }
   if (controlsDialog.open || event.altKey || event.ctrlKey || event.metaKey) return;
-  if (shop.isOpen) return;
+  if (shop.isOpen || desktop.isOpen) return;
   if (noteDialog.open) {
     if (event.code === "KeyE") {
       event.preventDefault();

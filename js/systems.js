@@ -241,6 +241,7 @@ const systems = [
       "▀▀     ▀▀▀▀     ▀▀",
     ],
   },
+  { name: "Windows 11", ui: "desktop" },
 ];
 
 const pentium4 = {
