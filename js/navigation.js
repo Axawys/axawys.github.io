@@ -67,12 +67,12 @@ export function makeField(start) {
   return parent;
 }
 
-export function clearPath(body, target) {
+export function clearPath(body, target, radius = body.radius) {
   const dx = target.x - body.x;
   const dy = target.y - body.y;
   const count = Math.max(1, Math.ceil(Math.hypot(dx, dy) / 6));
   for (let step = 1; step <= count; step++) {
-    if (!isWalkable(body.x + dx * step / count, body.y + dy * step / count, body.radius)) return false;
+    if (!isWalkable(body.x + dx * step / count, body.y + dy * step / count, radius)) return false;
   }
   return true;
 }

@@ -2,7 +2,7 @@ import { createAction } from "./action.js";
 import { createAchievements } from "./achievements.js";
 import { createJoystick } from "./joystick.js";
 import { createRenderer, movePlayer, nearestInteraction, noteSpots, player, stations } from "./room.js";
-import { createAmmoShop } from "./shop.js";
+import { createShop } from "./shop.js";
 import { drawWeaponIcon } from "./sprites.js";
 import { shuffleSystems } from "./systems.js";
 import { finaleAchievement, tasks } from "./tasks.js";
@@ -43,7 +43,7 @@ const aimStick = createJoystick(canvas, byId("aim-joystick"), "right");
 const achievementTasks = tasks.filter(task => task.achievement);
 const achievements = createAchievements([...achievementTasks, finaleAchievement], () => canvas.focus({ preventScroll: true }));
 const action = createAction(showNotice, () => achievements.unlock(finaleAchievement));
-const shop = createAmmoShop(action, () => canvas.focus({ preventScroll: true }));
+const shop = createShop(action, player, () => canvas.focus({ preventScroll: true }));
 action.state.medal = achievements.has(finaleAchievement.event);
 const terminal = createTerminal(stations, systems, (task, station, event) => {
   taskRows.get(task).classList.add("done");
@@ -191,7 +191,7 @@ function interact() {
 
   resetInput();
   if (target.kind === "note") openNote(target);
-  else if (target.kind === "kiosk") shop.open();
+  else if (target.kind === "kiosk") shop.open(target.catalog);
   else terminal.open(target);
   return true;
 }
@@ -234,8 +234,11 @@ function updateInteraction(paused) {
   if (target !== nearby) {
     nearby = target;
     interactButton.hidden = !target;
-    interactText.textContent = target?.task ? "Читать подсказку" : target === note ? "Читать записку"
-      : target?.kind === "kiosk" ? "Купить боеприпасы" : "Сесть за ПК";
+    if (target?.kind === "kiosk") {
+      interactText.textContent = target.catalog === "medkits" ? "Купить аптечку" : "Купить боеприпасы";
+    } else {
+      interactText.textContent = target?.task ? "Читать подсказку" : target === note ? "Читать записку" : "Сесть за ПК";
+    }
     interactButton.classList.toggle("below", target?.kind === "note" || target?.kind === "kiosk");
   }
   if (!target) return;

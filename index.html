@@ -49,7 +49,7 @@
         <dt>Оружие</dt>
         <dd class="guide-keyboard"><kbd>ЛКМ</kbd> — стрелять. Меняйте оружие на <kbd>1–6</kbd>, колёсиком или нажатием на слот.</dd>
         <dd class="guide-touch">Коснитесь правой половины карты и сдвиньте палец, чтобы прицеливаться и стрелять. Выбирайте оружие нажатием на слот.</dd>
-        <dd>Стрельба и слоты открываются после появления первого врага. Предметы и монеты подбираются на ходу. Киоск с боеприпасами находится в центре офиса.</dd>
+        <dd>Стрельба и слоты открываются после появления первого врага. Предметы и монеты подбираются на ходу. Киоски с боеприпасами и аптечками находятся в центре офиса.</dd>
       </div>
       <div>
         <dt>Достижения</dt>
@@ -88,12 +88,15 @@
     </form>
   </dialog>
 
-  <dialog id="ammo-shop" class="ammo-shop" aria-labelledby="shop-title">
+  <dialog id="kiosk-shop" class="kiosk-shop" aria-labelledby="shop-title">
     <header>
-      <h2 id="shop-title">Киоск боеприпасов</h2>
+      <h2 id="shop-title"></h2>
       <button id="shop-close" type="button" autofocus>Закрыть</button>
     </header>
-    <div class="shop-wallet"><i class="coin-icon" aria-hidden="true"></i> Монеты <output id="shop-coins">0</output></div>
+    <div class="shop-summary">
+      <div class="shop-wallet"><i class="coin-icon" aria-hidden="true"></i> Монеты <output id="shop-coins">0</output></div>
+      <p id="shop-health" hidden></p>
+    </div>
     <ul id="shop-offers" class="shop-offers"></ul>
     <p id="shop-status" class="shop-status" role="status"></p>
   </dialog>

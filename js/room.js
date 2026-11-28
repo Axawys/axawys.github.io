@@ -6,6 +6,7 @@ export const width = 1220;
 export const height = 966;
 const centerX = width / 2;
 const floor = { left: 15, right: width - 15, top: 49, bottom: height - 32 };
+const floorGrid = { x: 10, y: 41, tileWidth: 20, tileHeight: 19 };
 export const door = { x: centerX, y: floor.bottom - 9 };
 const breakAreaTop = 702;
 export const playerStart = { x: centerX, y: breakAreaTop + 40 };
@@ -62,7 +63,13 @@ function item(kind, x, y, box) {
   return { kind, x, y, box: box.map((side, index) => side + (index % 2 ? y : x)) };
 }
 
-export const ammoKiosk = item("kiosk", 654, 500, [-23, -7, 23, 12]);
+function kiosk(column, row, catalog) {
+  const x = floorGrid.x + Math.floor((column + 0.5) * floorGrid.tileWidth);
+  const y = floorGrid.y + Math.floor((row + 0.5) * floorGrid.tileHeight);
+  return { ...item("kiosk", x, y, [-23, -7, 23, 12]), catalog };
+}
+
+const kiosks = [kiosk(32, 24, "ammo"), kiosk(27, 24, "medkits")];
 export const networkRacks = [[1029, 148], [1061, 148], [1093, 148], [1125, 148], [1111, 201], [1143, 201]]
   .map(([x, y]) => item("server", x, y, [-13, -13, 13, 15]));
 
@@ -105,7 +112,7 @@ const furniture = [
   item("crate", 1154, door.y - 49, [-10, -5, 12, 10]),
   item("plant", 553, door.y - 28, [-7, -2, 7, 7]),
   item("plant", 667, door.y - 28, [-7, -2, 7, 7]),
-  ammoKiosk,
+  ...kiosks,
 ];
 
 const obstacles = [
@@ -155,8 +162,7 @@ export function movePlayer(dx, dy, elapsed) {
 
 export function nearestInteraction(notes) {
   return notes.find(note => Math.hypot(player.x - note.x, player.y - note.y) < 23)
-    ?? (Math.abs(player.x - ammoKiosk.x) <= 27 && player.y >= ammoKiosk.y + 13 && player.y <= ammoKiosk.y + 36
-      ? ammoKiosk : undefined)
+    ?? kiosks.find(kiosk => Math.abs(player.x - kiosk.x) <= 27 && player.y >= kiosk.y + 13 && player.y <= kiosk.y + 36)
     ?? stations.find(station => !station.offline && !station.busy && Math.abs(player.x - station.x) <= 29
     && player.y >= station.y + 20 && player.y <= station.y + 53);
 }
@@ -282,7 +288,7 @@ export function createRenderer(canvas) {
 }
 
 function drawOffice(ctx) {
-  const floorTop = 41;
+  const { x: tileLeft, y: floorTop, tileWidth, tileHeight } = floorGrid;
   const floorBottom = height - 26;
   box(ctx, "#101915", 0, 0, width, height);
   box(ctx, "#24372e", 10, 2, width - 20, 38);
@@ -311,8 +317,8 @@ function drawOffice(ctx) {
   ctx.beginPath();
   ctx.rect(10, floorTop, width - 20, floorBottom - floorTop);
   ctx.clip();
-  for (let row = 0, y = floorTop; y < floorBottom; row++, y += 19) {
-    for (let col = 0, x = 10; x < width - 10; col++, x += 20) {
+  for (let row = 0, y = floorTop; y < floorBottom; row++, y += tileHeight) {
+    for (let col = 0, x = tileLeft; x < width - tileLeft; col++, x += tileWidth) {
       const index = (row * row + col * 3 + row * col) % tileColors.length;
       box(ctx, tileColors[index], x + 1, y + 1, 19, 18);
       box(ctx, "#31473c", x + 2, y + 1, 17, 1);
@@ -480,7 +486,7 @@ function drawDesk(ctx, { number, id, x, y, screen, offline }, near, discovered, 
 }
 
 
-function drawFurniture(ctx, { x, y, kind, box: bounds, hp, maxHp, flash }, time) {
+function drawFurniture(ctx, { x, y, kind, box: bounds, hp, maxHp, flash, catalog }, time) {
   if (kind === "server") {
     box(ctx, "#14281fb5", x - 11, y + 5, 25, 13);
     if (hp === 0) {
@@ -507,20 +513,27 @@ function drawFurniture(ctx, { x, y, kind, box: bounds, hp, maxHp, flash }, time)
     return;
   }
   if (kind === "kiosk") {
+    const medkits = catalog === "medkits";
     box(ctx, "#152820b0", x - 25, y + 7, 52, 8);
-    box(ctx, "#281f1b", x - 23, y - 23, 46, 35);
-    box(ctx, "#7f6844", x - 21, y - 20, 42, 29);
-    box(ctx, "#b8965e", x - 21, y - 21, 42, 4);
+    box(ctx, medkits ? "#2b2022" : "#281f1b", x - 23, y - 23, 46, 35);
+    box(ctx, medkits ? "#794e4c" : "#7f6844", x - 21, y - 20, 42, 29);
+    box(ctx, medkits ? "#af7671" : "#b8965e", x - 21, y - 21, 42, 4);
     box(ctx, "#253930", x - 17, y - 13, 23, 15);
-    for (const offset of [-13, -7, -1]) {
-      box(ctx, "#d0ae70", x + offset, y - 9, 3, 7);
-      box(ctx, "#f6d083", x + offset + 1, y - 10, 1, 2);
+    if (medkits) {
+      box(ctx, "#d5d9c9", x - 13, y - 11, 15, 11);
+      box(ctx, "#c16b66", x - 7, y - 10, 3, 9);
+      box(ctx, "#c16b66", x - 10, y - 7, 9, 3);
+    } else {
+      for (const offset of [-13, -7, -1]) {
+        box(ctx, "#d0ae70", x + offset, y - 9, 3, 7);
+        box(ctx, "#f6d083", x + offset + 1, y - 10, 1, 2);
+      }
     }
     box(ctx, "#352d21", x + 10, y - 12, 7, 13);
     box(ctx, "#eabd65", x + 12, y - 10, 3, 2);
     box(ctx, "#151e18", x - 15, y + 4, 28, 3);
-    box(ctx, "#3a3223", x - 24, y - 30, 48, 11);
-    label(ctx, "ПАТРОНЫ", x, y - 28, "#f2d893");
+    box(ctx, medkits ? "#442b2a" : "#3a3223", x - 24, y - 30, 48, 11);
+    label(ctx, medkits ? "АПТЕЧКИ" : "ПАТРОНЫ", x, y - 28, medkits ? "#f5c8be" : "#f2d893");
     return;
   }
   if (kind === "partition") {

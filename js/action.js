@@ -4,10 +4,10 @@ import { clearPath, makeField, nearestCell, pursue } from "./navigation.js";
 import { createWeapons, weapons } from "./weapons.js";
 
 const robotTypes = {
-  spider: { name: "Паук Ubuntu", radius: 5, eye: 8, maxHp: 1100, speed: 88, damage: 24, color: "#ff947a", phase: 1, coins: 45 },
+  spider: { name: "Паук Ubuntu", radius: 5, meleeReach: 19, eye: 8, maxHp: 1100, speed: 88, damage: 24, color: "#ff947a", phase: 1, coins: 45 },
   walker: { name: "Робот ALT Linux", radius: 6, eye: 21, maxHp: 1920, speed: 70, damage: 38, color: "#f6c786", phase: 1, coins: 65 },
-  swarm: { name: "ИИ-агент", radius: 3, eye: 4, maxHp: 440, speed: 87, damage: 12, color: "#e6ac76", coins: 8 },
-  agent: { radius: 6, eye: 13, maxHp: 1440, speed: 74, damage: 25, coins: 32 },
+  swarm: { name: "ИИ-агент", radius: 3, meleeReach: 14, eye: 4, maxHp: 440, speed: 87, damage: 12, color: "#e6ac76", coins: 8 },
+  agent: { radius: 6, meleeReach: 24, eye: 13, maxHp: 1440, speed: 74, damage: 25, coins: 32 },
   furry: { name: "Фурри", radius: 6, eye: 17, maxHp: 500, speed: 98, damage: 28, color: "#a8c8ff", coins: 18 },
 };
 
@@ -21,6 +21,11 @@ const allyColor = "#91e6b2";
 const allyGift = 8;
 const serverHp = 150;
 const serverCoins = 10;
+export const medkits = [
+  { hp: 10, cost: 5 },
+  { hp: 25, cost: 10 },
+  { hp: 50, cost: 18 },
+];
 const allyTypes = {
   ally: { kind: "furry", name: "Фурри-союзник", maxHp: 500, side: 1 },
   gigacode: { kind: "agent", name: "gigacode", maxHp: robotTypes.agent.maxHp / 2, side: -1 },
@@ -56,6 +61,11 @@ function nearFree(x, y, radius) {
     }
   }
   return null;
+}
+
+function availableOffer(quantity, price, space) {
+  const available = Math.min(quantity, space);
+  return { quantity: available, cost: Math.ceil(price * available / quantity) };
 }
 
 export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
@@ -129,14 +139,27 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
   function ammoOffer(index) {
     const weapon = weapons[index];
     if (!weapon?.shop) return null;
-    const rounds = Math.min(weapon.shop.rounds, weapon.capacity - arsenal.ammo[index]);
-    return { rounds, cost: Math.ceil(weapon.shop.cost * rounds / weapon.shop.rounds) };
+    return availableOffer(weapon.shop.rounds, weapon.shop.cost, weapon.capacity - arsenal.ammo[index]);
   }
 
   function buyAmmo(index) {
     const offer = ammoOffer(index);
-    if (!offer?.rounds || offer.cost > state.coins || state.dead) return null;
-    arsenal.collect(index, offer.rounds, false);
+    if (!offer?.quantity || offer.cost > state.coins || state.dead) return null;
+    arsenal.collect(index, offer.quantity, false);
+    state.coins -= offer.cost;
+    return offer;
+  }
+
+  function medkitOffer(index) {
+    const medkit = medkits[index];
+    if (!medkit) return null;
+    return availableOffer(medkit.hp, medkit.cost, player.maxHp - player.hp);
+  }
+
+  function buyMedkit(index) {
+    const offer = medkitOffer(index);
+    if (!offer?.quantity || offer.cost > state.coins || state.dead) return null;
+    player.hp += offer.quantity;
     state.coins -= offer.cost;
     return offer;
   }
@@ -452,6 +475,16 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
         }
         continue;
       }
+      const contact = gap < robot.radius + player.radius + 1;
+      const inMeleeRange = robot.meleeReach ? gap <= robot.meleeReach && clearPath(robot, player, 0) : contact && !ranged;
+      if (inMeleeRange) {
+        if (robot.kind === "furry" && !state.invulnerable) {
+          robot.attackUntil = state.time + 0.19;
+          robot.attackSide = player.x < robot.x ? -1 : 1;
+        }
+        hitPlayer(robot.damage);
+        if (!ranged) continue;
+      }
       if (clear && gap <= 138) {
         if (gap > 0 && gap < 87) {
           const travel = Math.min(robot.speed * elapsed, 87 - gap) / gap;
@@ -459,15 +492,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
         }
         continue;
       }
-      if (gap < robot.radius + player.radius + 1) {
-        if (ranged) continue;
-        if (robot.kind === "furry" && !state.invulnerable) {
-          robot.attackUntil = state.time + 0.19;
-          robot.attackSide = player.x < robot.x ? -1 : 1;
-        }
-        hitPlayer(robot.damage);
-        continue;
-      }
+      if (ranged && contact) continue;
       if (pursue(robot, player, field, robot.speed * elapsed)) robot.stride += elapsed * 13;
     }
     for (let i = 0; i < state.robots.length; i++) {
@@ -603,5 +628,8 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     return false;
   }
 
-  return { state, trigger, startCelebration, update, ammoOffer, buyAmmo, cycleWeapon: arsenal.cycle, selectWeapon: arsenal.select };
+  return {
+    state, trigger, startCelebration, update, ammoOffer, buyAmmo, medkitOffer, buyMedkit,
+    cycleWeapon: arsenal.cycle, selectWeapon: arsenal.select,
+  };
 }

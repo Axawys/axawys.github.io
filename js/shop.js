@@ -1,48 +1,77 @@
+import { medkits } from "./action.js";
 import { weapons } from "./weapons.js";
 
-export function createAmmoShop(action, restoreFocus) {
-  const dialog = document.getElementById("ammo-shop");
+export function createShop(action, player, restoreFocus) {
+  const dialog = document.getElementById("kiosk-shop");
+  const title = document.getElementById("shop-title");
   const balance = document.getElementById("shop-coins");
+  const health = document.getElementById("shop-health");
   const status = document.getElementById("shop-status");
   const list = document.getElementById("shop-offers");
-  const offers = [];
+  const catalogs = {
+    ammo: {
+      title: "Киоск боеприпасов",
+      full: "Боезапас полон",
+      unit: "боеприпасов",
+      offer: action.ammoOffer,
+      buy: action.buyAmmo,
+      products: weapons.flatMap((weapon, index) => weapon.shop ? [{
+        index, name: weapon.name,
+        stock: () => "В запасе " + action.state.ammo[index] + "/" + weapon.capacity,
+      }] : []),
+    },
+    medkits: {
+      title: "Киоск аптечек",
+      full: "Здоровье полное",
+      unit: "HP",
+      offer: action.medkitOffer,
+      buy: action.buyMedkit,
+      products: medkits.map((medkit, index) => ({
+        index, name: "Аптечка +" + medkit.hp + " HP",
+      })),
+    },
+  };
 
-  for (const [index, weapon] of weapons.entries()) {
-    if (!weapon.shop) continue;
-    const row = document.createElement("li");
-    const description = document.createElement("div");
-    const name = document.createElement("strong");
-    const stock = document.createElement("span");
-    const buy = document.createElement("button");
-    name.textContent = weapon.name;
-    buy.type = "button";
-    buy.addEventListener("click", () => {
-      const purchase = action.buyAmmo(index);
-      if (!purchase) return;
-      status.textContent = weapon.name + " · +" + purchase.rounds;
-      update();
-    });
-    description.append(name, stock);
-    row.append(description, buy);
-    list.append(row);
-    offers.push({ index, weapon, stock, buy });
-  }
-
-  function update() {
-    balance.value = String(action.state.coins);
-    for (const { index, weapon, stock, buy } of offers) {
-      const { cost, rounds } = action.ammoOffer(index);
-      stock.textContent = "В запасе " + action.state.ammo[index] + "/" + weapon.capacity;
-      buy.disabled = !rounds || cost > action.state.coins;
-      buy.textContent = rounds ? "+" + rounds + " за " + cost : "Боезапас полон";
-      buy.setAttribute("aria-label", rounds
-        ? "Купить " + weapon.name + " · " + rounds + " боеприпасов за " + cost + " монет"
-        : weapon.name + " · боезапас полон");
-    }
-  }
-
-  function open() {
+  function open(catalog) {
+    const store = catalogs[catalog];
+    title.textContent = store.title;
+    health.hidden = catalog !== "medkits";
     status.textContent = "";
+    const offers = store.products.map(product => {
+      const row = document.createElement("li");
+      const description = document.createElement("div");
+      const name = document.createElement("strong");
+      const stock = product.stock && document.createElement("span");
+      const buy = document.createElement("button");
+      name.textContent = product.name;
+      buy.type = "button";
+      buy.addEventListener("click", () => {
+        const purchase = store.buy(product.index);
+        if (!purchase) return;
+        status.textContent = "Получено +" + purchase.quantity + " " + store.unit;
+        update();
+      });
+      description.append(name);
+      if (stock) description.append(stock);
+      row.append(description, buy);
+      return { product, row, stock, buy };
+    });
+    list.replaceChildren(...offers.map(offer => offer.row));
+
+    function update() {
+      balance.value = String(action.state.coins);
+      if (!health.hidden) health.textContent = "Здоровье " + player.hp + "/" + player.maxHp;
+      for (const { product, stock, buy } of offers) {
+        const { cost, quantity } = store.offer(product.index);
+        if (stock) stock.textContent = product.stock();
+        buy.disabled = !quantity || cost > action.state.coins;
+        buy.textContent = quantity ? "+" + quantity + " за " + cost : store.full;
+        buy.setAttribute("aria-label", quantity
+          ? "Купить " + product.name + " · " + quantity + " " + store.unit + " за " + cost + " монет"
+          : product.name + " · " + store.full);
+      }
+    }
+
     update();
     dialog.showModal();
   }
