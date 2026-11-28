@@ -134,6 +134,13 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     });
   }
 
+  function addAlly(ally) {
+    state.allies.push({
+      color: allyColor, radius: 6, stride: 0, ...ally,
+      phase: "guard", remaining: allyDuration, nextAttack: state.time,
+    });
+  }
+
   function activateTokenComputer() {
     if (tokenComputer.offline || state.dead) return;
     const { x, y, cost } = tokenComputer;
@@ -147,10 +154,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     state.tokens -= cost;
     removeWorkstation(tokenComputer);
     const hp = robotTypes.agent.maxHp;
-    state.allies.push({
-      ...point, kind: "crutch", name: "Робот из костылей", color: allyColor, radius: 6, hp, maxHp: hp,
-      stride: 0, phase: "guard", side: -1, nextAttack: state.time,
-    });
+    addAlly({ ...point, kind: "crutch", name: "Робот из костылей", hp, maxHp: hp, side: -1 });
     state.coins += allyGift;
     shock(x, y - 9, 44, "#c6a6fa", 0.45);
     burst(x, y - 13, ["#d4bcff", "#b597e5", "#91e6b2"], 46, 119);
@@ -165,10 +169,9 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
       const { kind, name, x, y, radius, stride } = robot;
       const maxHp = robot.reviveAt ? robot.maxHp * 2 : robot.maxHp;
       state.robots.splice(index, 1);
-      state.allies.push({
+      addAlly({
         kind, name, x, y, radius, stride, maxHp, hp: robot.reviveAt ? maxHp : robot.hp,
-        color: allyColor, phase: "guard", robotPhase: robot.reviveAt ? 2 : robot.phase,
-        side: x <= player.x ? -1 : 1, nextAttack: state.time,
+        robotPhase: robot.reviveAt ? 2 : robot.phase, side: x <= player.x ? -1 : 1,
       });
       shock(x, y - 5, 23, allyColor, 0.32);
       burst(x, y - robot.eye, [allyColor, "#e0f8d8"], 16, 66);
@@ -267,10 +270,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
       const point = nearFree(station.x + allyType.side * 25, station.y + 45, 6) ?? nearFree(player.x, player.y, 6);
       if (!point) return false;
       removeWorkstation(station);
-      state.allies.push({
-        ...point, ...allyType, color: allyColor, radius: 6, hp: allyType.maxHp,
-        stride: 0, phase: "guard", remaining: allyDuration, nextAttack: state.time,
-      });
+      addAlly({ ...point, ...allyType, hp: allyType.maxHp });
       state.coins += allyGift;
       burst(point.x, point.y - 12, [allyColor, "#e0f8d8"], 16, 66);
       onNotice(allyType.name + " пришёл на помощь · +" + allyGift + " монет");
@@ -402,13 +402,12 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
       if (walkOut(ally, elapsed, 110)) removeAlly(ally);
       return;
     }
-    if (ally.remaining !== undefined) {
-      ally.remaining = Math.max(0, ally.remaining - sceneElapsed);
-      if (ally.remaining === 0) {
-        ally.phase = "door";
-        onNotice(ally.name + " уходит");
-        return;
-      }
+    ally.remaining = Math.max(0, ally.remaining - sceneElapsed);
+    if (ally.remaining === 0) {
+      delete ally.repair;
+      ally.phase = "door";
+      onNotice(ally.name + " уходит");
+      return;
     }
     if (ally.repairsServers && repairNetwork(ally, elapsed)) return;
 
