@@ -163,7 +163,7 @@ function hintCommand(text) {
 const taskRows = new Map(tasks.map(task => {
   const row = document.createElement("li");
   const title = document.createElement("strong");
-  title.textContent = task.title;
+  title.textContent = task.noteTitle ?? task.title;
   const instruction = document.createElement("span");
   instruction.append(commandSequence(task));
   row.append(title, instruction);
