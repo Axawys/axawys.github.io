@@ -399,7 +399,7 @@ function updateAim() {
 
 let shownAllies = [];
 function updateAllyTimers() {
-  const active = action.state.allies.filter(ally => ally.remaining > 0);
+  const active = action.state.allies.filter(ally => ally.phase === "guard" && ally.remaining > 0);
   if (active.length !== shownAllies.length || active.some((ally, index) => ally !== shownAllies[index])) {
     shownAllies = active;
     allyTimers.hidden = !active.length;

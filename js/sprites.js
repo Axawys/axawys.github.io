@@ -469,8 +469,8 @@ export function drawRobotTags(ctx, robots, livingPlayer, camera, weapon = null, 
   }
 }
 
-function drawElder(ctx, visitor, time, player, x, y, step) {
-  const side = player.x >= x ? 1 : -1;
+function drawElder(ctx, visitor, time, facingX, x, y, step, shaking) {
+  const side = facingX >= x ? 1 : -1;
   const striking = time < visitor.swingUntil;
   const raised = visitor.phase === "swing";
   box(ctx, "#352e27", x - 5, y - 6 - step, 4, 6);
@@ -482,9 +482,10 @@ function drawElder(ctx, visitor, time, player, x, y, step) {
   box(ctx, "#e1ded0", x - 5, y - 25, 10, 4);
   box(ctx, "#eee8dc", x - 3, y - 19, 7, 3);
   box(ctx, "#5d463b", x + side * 2, y - 21, 2, 1);
-  const handX = x + side * 7;
+  const caneSide = shaking ? -side : side;
+  const handX = x + caneSide * 7;
   const handY = y - (raised ? 17 : 10);
-  const tipX = handX + side * (striking ? 14 : raised ? 5 : 3);
+  const tipX = handX + caneSide * (striking ? 14 : raised ? 5 : 3);
   const tipY = striking ? y - 12 : raised ? y - 28 : y;
   box(ctx, "#dab18d", handX - 1, handY, 3, 3);
   line(ctx, "#5f412e", handX, handY + 1, tipX, tipY, 2);
@@ -492,13 +493,15 @@ function drawElder(ctx, visitor, time, player, x, y, step) {
   if (striking) line(ctx, "#f3d5a7", tipX - side * 5, tipY - 4, tipX, tipY - 3);
 }
 
-export function drawVisitor(ctx, visitor, time, player) {
+export function drawVisitor(ctx, visitor, time, player, handshake) {
   const x = Math.round(visitor.x);
   const y = Math.round(visitor.y);
-  const step = Math.round(Math.sin(visitor.stride * 1.4));
+  const shaking = handshake?.started !== undefined && (handshake.elder === visitor || handshake.linus === visitor);
+  const step = shaking ? 0 : Math.round(Math.sin(visitor.stride * 1.4));
   box(ctx, "#13241bcc", x - 7, y - 1, 14, 4);
   if (visitor.kind === "elder") {
-    drawElder(ctx, visitor, time, player, x, y, step);
+    const facingX = shaking ? handshake.linus.x : visitor.phase === "chase" ? visitor.facingX ?? player.x : player.x;
+    drawElder(ctx, visitor, time, facingX, x, y, step, shaking);
   } else {
     box(ctx, "#435c71", x - 5, y - 7 - step, 4, 7);
     box(ctx, "#3d5061", x + 1, y - 7 + step, 4, 7);
@@ -513,13 +516,24 @@ export function drawVisitor(ctx, visitor, time, player) {
   }
 
   if (Math.hypot(x - player.x, y - player.y) < 94 || time < visitor.labelUntil) {
-    const name = visitor.kind === "elder" ? "Старик" : "Линус Торвальдс";
+    const name = visitor.kind === "elder" ? "Старик  " + visitor.hp + " HP" : "Линус Торвальдс";
     const half = Math.ceil(textWidth(name) / 2) + 4;
     const abovePlayer = visitor.kind === "elder" && Math.abs(x - player.x) < half + 37;
-    const tagY = abovePlayer ? Math.min(y - 40, Math.round(player.y) - 65) : y - 40;
+    const tagY = shaking ? Math.min(Math.round((handshake.elder.y + handshake.linus.y) / 2) - 40, Math.round(player.y) - 78)
+      - (visitor.kind === "elder" ? 13 : 0)
+      : abovePlayer ? Math.min(y - 40, Math.round(player.y) - 65) : y - 40;
     box(ctx, "#192921f5", x - half, tagY, half * 2, 11);
     label(ctx, name, x, tagY + 2, "#f2e3c3");
   }
+}
+
+export function drawHandshake(ctx, { linus, elder, started }, time) {
+  const x = (linus.x + elder.x) / 2;
+  const y = (linus.y + elder.y) / 2 - 12 + Math.round(Math.sin((time - started) * 24) * 2);
+  const side = linus.x <= elder.x ? 1 : -1;
+  line(ctx, "#9b6570", linus.x + side * 5, linus.y - 14, x, y, 3);
+  line(ctx, "#9a7557", elder.x - side * 5, elder.y - 14, x, y, 3);
+  box(ctx, "#f3c9a1", Math.round(x) - 1, Math.round(y) - 1, 4, 3);
 }
 
 function drawGentooFire(ctx, x, y, time) {

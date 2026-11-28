@@ -1,6 +1,7 @@
-import { door, height, isWalkable, moveBody, networkRacks, player, playerStart, supplySpots, width } from "./room.js";
+import { height, isWalkable, moveBody, nearFree, networkRacks, player, playerStart, supplySpots, width } from "./room.js";
 import { createHostileFire } from "./hostile-fire.js";
-import { clearPath, makeField, nearestCell, pursue } from "./navigation.js";
+import { clearPath, makeField, nearestCell, pursue, walkOut } from "./navigation.js";
+import { createVisitors } from "./visitors.js";
 import { createWeapons, weapons } from "./weapons.js";
 
 const robotTypes = {
@@ -47,21 +48,7 @@ const eventText = {
   walker: "Вы потревожили РКН",
   swarm: "На вас напали ИИ-агенты",
   furry: "Пушистая ярость",
-  visitor: "Линус Торвальдс прошёл мимо. Ядро в порядке.",
-  elder: "Ну и зачем ты это сделал? Оно же работало",
 };
-
-function nearFree(x, y, radius) {
-  if (isWalkable(x, y, radius)) return { x, y };
-  for (let distance = 8; distance <= 56; distance += 8) {
-    for (let index = 0; index < 8; index++) {
-      const angle = index * Math.PI / 4;
-      const point = { x: x + Math.cos(angle) * distance, y: y + Math.sin(angle) * distance };
-      if (isWalkable(point.x, point.y, radius)) return point;
-    }
-  }
-  return null;
-}
 
 function availableOffer(quantity, price, space) {
   const available = Math.min(quantity, space);
@@ -72,7 +59,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
   let weaponsUnlocked = false;
   const state = {
     time: 0, aim: { x: player.x, y: player.y - 48, visible: false },
-    robots: [], particles: [], shocks: [], shots: [], projectiles: [], pending: [], visitor: null, allies: [],
+    robots: [], particles: [], shocks: [], shots: [], projectiles: [], pending: [], visitors: [], handshake: null, allies: [],
     hostileBullets: [], hostileRockets: [],
     coins: 0, coinDrops: [],
     servers: networkRacks.map(rack => ({ ...rack, hp: serverHp, maxHp: serverHp, eye: 9, color: "#80aba5", coins: serverCoins })),
@@ -93,8 +80,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
   const hostileFire = createHostileFire(state, player, hitPlayer, burst, shock);
   let playerCell = -1;
   let playerField;
-  const queuedVisitors = [];
-  const doorField = makeField(nearestCell(door.x, door.y));
+  const visitors = createVisitors(state, { hitPlayer, onNotice, burst });
 
   function burst(x, y, colors, count, force, smoke = false) {
     for (let i = 0; i < count; i++) {
@@ -138,11 +124,11 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
   }
 
   const opsec = {
-    get targets() { return state.robots; },
+    get targets() { return state.robots.filter(robot => !visitors.isFleeing(robot)); },
     get conversionUsed() { return conversionUsed; },
     convert(robot) {
       const index = state.robots.indexOf(robot);
-      if (conversionUsed || index < 0) return false;
+      if (conversionUsed || index < 0 || visitors.isFleeing(robot)) return false;
       const { kind, name, x, y, radius, stride } = robot;
       const maxHp = robot.reviveAt ? robot.maxHp * 2 : robot.maxHp;
       state.robots.splice(index, 1);
@@ -158,7 +144,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
       return true;
     },
     destroyServers() {
-      if (state.robots.length) return false;
+      if (opsec.targets.length) return false;
       for (const server of state.servers) arsenal.damageServer(server, server.hp, server.x, server.y - server.eye);
       return true;
     },
@@ -232,30 +218,6 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     state.shake = 0;
   }
 
-  function callVisitor({ kind, view }) {
-    const candidates = [];
-    for (const ratio of [0.17, 0.4, 0.67, 0.87]) {
-      candidates.push(
-        { x: view.x - 56, y: view.y + view.h * ratio },
-        { x: view.x + view.w + 56, y: view.y + view.h * ratio },
-        { x: view.x + view.w * ratio, y: view.y - 54 },
-        { x: view.x + view.w * ratio, y: view.y + view.h + 42 },
-      );
-    }
-    const target = nearFree(player.x + 17, player.y + 10, 6) ?? nearFree(player.x, player.y, 6);
-    if (!target) return;
-    const field = makeField(nearestCell(target.x, target.y));
-    const start = candidates
-      .map(({ x, y }) => nearFree(x, y, 6))
-      .filter(point => point && field[nearestCell(point.x, point.y)] >= 0
-        && (point.x < view.x - 16 || point.x > view.x + view.w + 16
-          || point.y < view.y - 4 || point.y > view.y + view.h + 42))
-      .sort((a, b) => (Math.hypot(a.x - target.x, a.y - target.y) + Math.max(0, a.y - target.y) * 0.4)
-        - (Math.hypot(b.x - target.x, b.y - target.y) + Math.max(0, b.y - target.y) * 0.4))[0];
-    if (!start) return;
-    state.visitor = { ...start, kind, radius: 6, stride: 0, phase: "visit", target, field, labelUntil: 0 };
-  }
-
   function trigger(event, station, view) {
     const allyType = allyTypes[event];
     if (allyType) {
@@ -272,9 +234,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
       return;
     }
     if (event === "visitor" || event === "elder") {
-      const visit = { kind: event, view };
-      if (state.visitor) queuedVisitors.push(visit);
-      else callVisitor(visit);
+      visitors.call(event, view);
       return;
     }
     station.busy = true;
@@ -312,6 +272,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
       for (const ally of [...state.allies]) {
         if (Math.hypot(ally.x - blast.x, ally.y - blast.y) <= blast.radius) damageAlly(ally, gentooMobDamage);
       }
+      visitors.damageFromGentoo(blast);
       const shake = Math.min(1, Math.max(0, 1 - (distance - blast.radius) / 130));
       state.shake = Math.max(state.shake, shake);
       return;
@@ -334,66 +295,11 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     onNotice(eventText[event], true);
   }
 
-  function walkOut(actor, elapsed, speed) {
-    if (actor.phase === "door") {
-      if (Math.hypot(actor.x - door.x, actor.y - door.y) >= 8) {
-        if (pursue(actor, door, doorField, speed * elapsed)) actor.stride += elapsed * 11;
-        return false;
-      }
-      actor.x = door.x;
-      actor.phase = "exit";
-    }
-    actor.y += speed * elapsed;
-    actor.stride += elapsed * 11;
-    return actor.y > height + 28;
-  }
-
-  function advanceElder(visitor, elapsed) {
-    if (state.dead || Math.hypot(visitor.x - player.x, visitor.y - player.y) > 17) {
-      const target = nearFree(player.x, player.y, visitor.radius);
-      if (target && pursue(visitor, target, fieldTowardPlayer(target), 122 * elapsed)) visitor.stride += elapsed * 9;
-      return;
-    }
-    if (visitor.phase === "visit") {
-      visitor.phase = "swing";
-      visitor.swingAt = state.time + 0.5;
-      visitor.labelUntil = state.time + 2.5;
-      onNotice(eventText.elder);
-    } else if (state.time >= visitor.swingAt) {
-      hitPlayer(1, { ignoreProtection: true, ignoreArmor: true });
-      visitor.swingUntil = state.time + 0.24;
-      visitor.phase = "door";
-    }
-  }
-
-  function advanceVisitor(elapsed) {
-    const visitor = state.visitor;
-    if (!visitor) return;
-    if (visitor.kind === "elder" && (visitor.phase === "visit" || visitor.phase === "swing")) {
-      advanceElder(visitor, elapsed);
-      return;
-    }
-    if (visitor.phase === "door" || visitor.phase === "exit") {
-      if (walkOut(visitor, elapsed, 101)) {
-        state.visitor = null;
-        if (queuedVisitors.length) callVisitor(queuedVisitors.shift());
-      }
-      return;
-    }
-    if (Math.hypot(visitor.x - visitor.target.x, visitor.y - visitor.target.y) < 8) {
-      visitor.phase = "door";
-      visitor.labelUntil = state.time + 2.5;
-      onNotice(eventText.visitor);
-      return;
-    }
-    if (pursue(visitor, visitor.target, visitor.field, 101 * elapsed)) visitor.stride += elapsed * 11;
-  }
-
   function allyThreat(ally) {
     let nearest;
     let nearestDistance = 144;
     for (const robot of state.robots) {
-      if (robot.reviveAt) continue;
+      if (robot.reviveAt || visitors.isFleeing(robot)) continue;
       const distance = Math.hypot(robot.x - player.x, robot.y - player.y);
       if (distance >= nearestDistance || Math.hypot(robot.x - ally.x, robot.y - ally.y) > 164) continue;
       nearest = robot;
@@ -489,7 +395,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
   function advanceRobots(elapsed) {
     const field = fieldTowardPlayer(player);
     for (const robot of state.robots) {
-      if (robot.reviveAt || state.time < robot.ready) continue;
+      if (robot.reviveAt || visitors.isFleeing(robot) || state.time < robot.ready) continue;
       const gap = Math.hypot(player.x - robot.x, player.y - robot.y);
       const ranged = robot.phase === 2;
       const clear = ranged && hostileFire.fire(robot, gap);
@@ -527,10 +433,10 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     }
     for (let i = 0; i < state.robots.length; i++) {
       const first = state.robots[i];
-      if (first.reviveAt) continue;
+      if (first.reviveAt || visitors.isFleeing(first)) continue;
       for (let j = i + 1; j < state.robots.length; j++) {
         const second = state.robots[j];
-        if (second.reviveAt) continue;
+        if (second.reviveAt || visitors.isFleeing(second)) continue;
         const dx = second.x - first.x;
         const dy = second.y - first.y;
         const gap = Math.hypot(dx, dy);
@@ -638,8 +544,10 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     state.shocks = state.shocks.filter(effect => effect.life > 0);
     state.shots = state.shots.filter(shot => shot.life > 0);
     reviveRobots();
-    advanceVisitor(elapsed);
-    for (const ally of [...state.allies]) advanceAlly(ally, elapsed, sceneElapsed);
+    visitors.update(elapsed, sceneElapsed);
+    for (const ally of [...state.allies]) {
+      if (!visitors.isFleeing(ally)) advanceAlly(ally, elapsed, sceneElapsed);
+    }
     arsenal.update(elapsed, holding, pressed);
     hostileFire.update(elapsed);
     advanceCelebration(sceneElapsed);

@@ -1,6 +1,6 @@
 import { label } from "./pixel-font.js";
 import { box } from "./pixels.js";
-import { drawAlly, drawBlastZones, drawBurningRobot, drawCoinDrop, drawEffects, drawPlayer, drawRobot, drawRobotTags, drawSupply, drawVisitor, drawWeapon } from "./sprites.js";
+import { drawAlly, drawBlastZones, drawBurningRobot, drawCoinDrop, drawEffects, drawHandshake, drawPlayer, drawRobot, drawRobotTags, drawSupply, drawVisitor, drawWeapon } from "./sprites.js";
 
 export const width = 1220;
 export const height = 966;
@@ -133,6 +133,18 @@ export function isWalkable(x, y, radius = 4, ignoredObstacle) {
       const [left, top, right, bottom] = bounds;
       return x + radius > left && x - radius < right && y + radius > top && y - radius < bottom;
     });
+}
+
+export function nearFree(x, y, radius) {
+  if (isWalkable(x, y, radius)) return { x, y };
+  for (let distance = 8; distance <= 56; distance += 8) {
+    for (let index = 0; index < 8; index++) {
+      const angle = index * Math.PI / 4;
+      const point = { x: x + Math.cos(angle) * distance, y: y + Math.sin(angle) * distance };
+      if (isWalkable(point.x, point.y, radius)) return point;
+    }
+  }
+  return null;
 }
 
 export function moveBody(body, dx, dy) {
@@ -270,12 +282,15 @@ export function createRenderer(canvas) {
       drawBurningRobot(context, robot, time);
     } });
     for (const ally of action.allies) layers.push({ depth: ally.y, draw: () => drawAlly(context, ally, time) });
-    if (action.visitor) layers.push({ depth: action.visitor.y, draw: () => drawVisitor(context, action.visitor, time, player) });
+    for (const visitor of action.visitors) layers.push({
+      depth: visitor.y, draw: () => drawVisitor(context, visitor, time, player, action.handshake),
+    });
     layers.push({ depth: player.y, draw: () => {
       drawPlayer(context, visiblePlayer, action, time);
       if (weapon) drawWeapon(context, visiblePlayer, visibleAim, weapon, false);
     } });
     for (const layer of layers.sort((a, b) => a.depth - b.depth)) layer.draw(context, time * 1000);
+    if (action.handshake?.started !== undefined) drawHandshake(context, action.handshake, time);
     if (weapon) drawWeapon(context, visiblePlayer, visibleAim, weapon, true);
     drawEffects(context, action, time);
     drawRobotTags(context, action.robots, action.dead ? null : visiblePlayer, camera, weapon, action.allies, action.hostileRockets);

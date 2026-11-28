@@ -1,4 +1,4 @@
-import { height, isWalkable, moveBody, width } from "./room.js";
+import { door, height, isWalkable, moveBody, width } from "./room.js";
 
 const tile = 10;
 const columns = Math.ceil(width / tile);
@@ -92,4 +92,36 @@ export function pursue(body, target, field, distance) {
   if (length < 0.05) return false;
   const speed = Math.min(1, distance / length);
   return moveBody(body, dx * speed, dy * speed);
+}
+
+const doorCell = nearestCell(door.x, door.y);
+const doorField = makeField(doorCell);
+const exitY = height + 28;
+
+export function exitDistance(actor) {
+  const outside = exitY - door.y;
+  if (actor.phase === "exit") return Math.max(0, exitY - actor.y);
+  if (clearPath(actor, door)) return Math.hypot(door.x - actor.x, door.y - actor.y) + outside;
+
+  let cell = nearestCell(actor.x, actor.y);
+  if (cell < 0 || doorField[cell] < 0) return Math.hypot(door.x - actor.x, door.y - actor.y) + outside;
+  const start = center(cell);
+  let distance = Math.hypot(start.x - actor.x, start.y - actor.y);
+  for (; cell !== doorCell; cell = doorField[cell]) distance += tile;
+  const end = center(doorCell);
+  return distance + Math.hypot(end.x - door.x, end.y - door.y) + outside;
+}
+
+export function walkOut(actor, elapsed, speed) {
+  if (actor.phase === "door") {
+    if (Math.hypot(actor.x - door.x, actor.y - door.y) >= 8) {
+      if (pursue(actor, door, doorField, speed * elapsed)) actor.stride += elapsed * 11;
+      return false;
+    }
+    actor.x = door.x;
+    actor.phase = "exit";
+  }
+  actor.y += speed * elapsed;
+  actor.stride += elapsed * 11;
+  return actor.y >= exitY;
 }
