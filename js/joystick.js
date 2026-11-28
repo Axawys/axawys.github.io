@@ -36,8 +36,16 @@ export function createJoystick(canvas, indicator, side) {
     active.dx = directionX * strength;
     active.dy = directionY * strength;
     active.moved ||= distance > deadZone;
-    thumb.style.transform = "translate(" + directionX * travel + "px, " + directionY * travel + "px)";
+    active.thumbX = directionX * travel;
+    active.thumbY = directionY * travel;
+    active.thumbChanged = true;
     return true;
+  }
+
+  function draw() {
+    if (!active?.thumbChanged) return;
+    thumb.style.transform = "translate(" + active.thumbX + "px, " + active.thumbY + "px)";
+    active.thumbChanged = false;
   }
 
   function reset() {
@@ -58,5 +66,5 @@ export function createJoystick(canvas, indicator, side) {
     return event.pointerType === "touch" && event.pointerId === lastTouch?.id && lastTouch.moved;
   }
 
-  return { start, move, reset, release, blocksClick, get x() { return active?.dx ?? 0; }, get y() { return active?.dy ?? 0; } };
+  return { start, move, draw, reset, release, blocksClick, get x() { return active?.dx ?? 0; }, get y() { return active?.dy ?? 0; } };
 }

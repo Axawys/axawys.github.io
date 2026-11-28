@@ -143,7 +143,11 @@ export function movePlayer(dx, dy, elapsed) {
   player.moving = false;
   if (!dx && !dy) return;
 
-  player.facing = dy < 0 ? "north" : dy > 0 ? "south" : dx < 0 ? "west" : "east";
+  const facingSideways = player.facing === "west" || player.facing === "east";
+  const turnThreshold = facingSideways ? 1.12 : 1 / 1.12;
+  player.facing = Math.abs(dy) > Math.abs(dx) * turnThreshold
+    ? (dy < 0 ? "north" : "south")
+    : (dx < 0 ? "west" : "east");
   const step = elapsed * 107 / Math.max(1, Math.hypot(dx, dy));
   player.moving = moveBody(player, dx * step, dy * step);
   if (player.moving) player.stride += elapsed;
@@ -167,6 +171,8 @@ export function createRenderer(canvas) {
   const camera = { x: 0, y: 0, w: 0, h: 0 };
   let cssWidth = 0;
   let cssHeight = 0;
+  let previousTargetX = 0;
+  let previousTargetY = 0;
   function follow(elapsed, snap) {
     if (canvas.clientWidth !== cssWidth || canvas.clientHeight !== cssHeight) {
       cssWidth = canvas.clientWidth;
@@ -178,9 +184,19 @@ export function createRenderer(canvas) {
     }
     const targetX = Math.max(0, Math.min(width - camera.w, player.x - camera.w / 2));
     const targetY = Math.max(0, Math.min(height - camera.h, player.y - camera.h / 2 - 8));
-    const followRate = snap ? 1 : 1 - Math.exp(-12 * elapsed);
-    camera.x += (targetX - camera.x) * followRate;
-    camera.y += (targetY - camera.y) * followRate;
+    if (snap) {
+      camera.x = targetX;
+      camera.y = targetY;
+    } else if (elapsed > 0) {
+      const decay = 12 * elapsed;
+      const followRate = -Math.expm1(-decay);
+      // Follow the target's motion across the frame so varying frame times don't change the lag.
+      const movementRate = 1 - followRate / decay;
+      camera.x += (previousTargetX - camera.x) * followRate + (targetX - previousTargetX) * movementRate;
+      camera.y += (previousTargetY - camera.y) * followRate + (targetY - previousTargetY) * movementRate;
+    }
+    previousTargetX = targetX;
+    previousTargetY = targetY;
   }
 
   function worldPoint(clientX, clientY) {
@@ -203,9 +219,23 @@ export function createRenderer(canvas) {
     const shake = reduceMotion.matches ? 0 : action.shake * 7;
     const offsetX = Math.round(Math.sin(time * 74) * shake);
     const offsetY = Math.round(Math.cos(time * 59) * shake);
+    const left = Math.round(camera.x);
+    const top = Math.round(camera.y);
+    const weapon = action.armed ? action.weapon : null;
+    // Snap to the pixel grid after projecting the player into the camera view.
+    const visiblePlayer = {
+      ...player,
+      x: left + Math.round(player.x - camera.x),
+      y: top + Math.round(player.y - camera.y),
+    };
+    const visibleAim = weapon && {
+      ...action.aim,
+      x: action.aim.x + visiblePlayer.x - player.x,
+      y: action.aim.y + visiblePlayer.y - player.y,
+    };
     box(context, "#101915", 0, 0, camera.w, camera.h);
     context.save();
-    context.translate(-Math.round(camera.x) + offsetX, -Math.round(camera.y) + offsetY);
+    context.translate(-left + offsetX, -top + offsetY);
     context.drawImage(backdrop, 0, 0);
     if (action.pending.some(event => event.blast)) {
       context.save();
@@ -215,7 +245,6 @@ export function createRenderer(canvas) {
       drawBlastZones(context, action.pending);
       context.restore();
     }
-    const weapon = action.armed ? action.weapon : null;
     const layers = [...fixedLayers];
     for (const station of stations) {
       const hot = action.pending.some(event => event.station === station && event.phase);
@@ -240,13 +269,13 @@ export function createRenderer(canvas) {
     for (const ally of action.allies) layers.push({ depth: ally.y, draw: () => drawAlly(context, ally, time) });
     if (action.visitor) layers.push({ depth: action.visitor.y, draw: () => drawVisitor(context, action.visitor, time, player) });
     layers.push({ depth: player.y, draw: () => {
-      drawPlayer(context, player, action, time);
-      if (weapon) drawWeapon(context, player, action.aim, weapon, false);
+      drawPlayer(context, visiblePlayer, action, time);
+      if (weapon) drawWeapon(context, visiblePlayer, visibleAim, weapon, false);
     } });
     for (const layer of layers.sort((a, b) => a.depth - b.depth)) layer.draw(context, time * 1000);
-    if (weapon) drawWeapon(context, player, action.aim, weapon, true);
+    if (weapon) drawWeapon(context, visiblePlayer, visibleAim, weapon, true);
     drawEffects(context, action, time);
-    drawRobotTags(context, action.robots, action.dead ? null : player, camera, weapon, action.allies, action.hostileRockets);
+    drawRobotTags(context, action.robots, action.dead ? null : visiblePlayer, camera, weapon, action.allies, action.hostileRockets);
     context.restore();
   }
   return { camera, follow, worldPoint, screenPoint, draw };

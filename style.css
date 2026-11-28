@@ -17,8 +17,8 @@ ul { list-style: none; padding: 0; }
 code, kbd { font-family: var(--mono); }
 kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 25px; min-height: 24px; padding: 1px 6px; color: #c7dcd0; background: #101913; border: 1px solid #35493d; border-bottom-width: 2px; font-size: .75rem; white-space: nowrap; }
 
-.game { --hud-bottom: max(24px, env(safe-area-inset-bottom)); --slot-height: 68px; position: fixed; inset: 0; overflow: hidden; background: #121c18; }
-#room { display: block; width: 100%; height: 100%; outline: none; image-rendering: pixelated; touch-action: none; }
+.game { --hud-bottom: max(24px, env(safe-area-inset-bottom)); --slot-height: 68px; position: fixed; inset: 0; overflow: hidden; background: #121c18; touch-action: none; }
+#room { display: block; width: 100%; height: 100%; outline: none; image-rendering: pixelated; }
 #room.armed { cursor: crosshair; }
 .interact { position: absolute; z-index: 1; transform: translate(-50%, -100%); display: flex; align-items: center; gap: 7px; min-height: 32px; padding: 4px 8px; border: 1px solid #92bb97; background: #162a20; color: #d8f1d9; box-shadow: 0 3px #0b1710a8; white-space: nowrap; font: 700 .8rem var(--mono); }
 .interact.below { transform: translateX(-50%); }

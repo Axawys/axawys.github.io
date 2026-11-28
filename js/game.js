@@ -177,7 +177,6 @@ let nearby;
 let previousTime;
 let pointer;
 let shootingPointer;
-let canvasPressArmed = false;
 let shotRequest;
 let interactionKeyHeld = false;
 
@@ -333,18 +332,20 @@ function stopShooting() {
 }
 
 canvas.addEventListener("pointermove", event => {
-  if (moveStick.move(event) || aimStick.move(event) || event.pointerType === "touch") return;
+  if (event.pointerType === "touch") {
+    if (!moveStick.move(event)) aimStick.move(event);
+    return;
+  }
   pointer = { x: event.clientX, y: event.clientY };
 });
 canvas.addEventListener("pointerdown", event => {
-  if (event.button !== 0 || action.state.dead || gamePaused()) return;
-  canvasPressArmed = action.state.armed;
+  if (action.state.dead || gamePaused()) return;
   if (event.pointerType === "touch") {
     pointer = undefined;
-    if (!moveStick.start(event) && canvasPressArmed) aimStick.start(event);
+    if (!moveStick.start(event) && action.state.armed) aimStick.start(event);
     return;
   }
-  if (!canvasPressArmed || shootingPointer !== undefined) return;
+  if (event.button !== 0 || !action.state.armed || shootingPointer !== undefined) return;
   shootingPointer = event.pointerId;
   canvas.setPointerCapture(event.pointerId);
   pointer = { x: event.clientX, y: event.clientY };
@@ -361,7 +362,7 @@ for (const type of ["pointerup", "pointercancel", "pointerleave", "lostpointerca
   canvas.addEventListener(type, releaseAim);
 }
 canvas.addEventListener("click", event => {
-  if (canvasPressArmed || action.state.armed || !nearby || moveStick.blocksClick(event) || aimStick.blocksClick(event)) return;
+  if (action.state.armed || !nearby || moveStick.blocksClick(event) || aimStick.blocksClick(event)) return;
   const point = renderer.worldPoint(event.clientX, event.clientY);
   if (Math.abs(point.x - nearby.x) < 34 && Math.abs(point.y - nearby.y) < 33) interact();
 });
@@ -437,6 +438,8 @@ function frame(time) {
     resetInput();
     renderer.follow(elapsed, true);
   }
+  moveStick.draw();
+  aimStick.draw();
   updateInteraction(paused);
   if (health.value !== String(player.hp)) health.value = String(player.hp);
   if (armor.value !== String(player.armor)) armor.value = String(player.armor);
