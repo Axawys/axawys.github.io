@@ -44,7 +44,10 @@ export function createVisitors(state, { hitPlayer, onNotice, burst }) {
       ...start, kind, radius: 6, stride: 0, phase: "visit", target, remaining: visitDuration,
       labelUntil: 0,
     };
-    if (kind === "elder") visitor.hp = 1;
+    if (kind === "elder") {
+      visitor.hp = 1;
+      visitor.damage = state.outfitRemaining > 0 ? 25 : 1;
+    }
     state.visitors.push(visitor);
     if (kind !== "elder" || state.handshake) return;
 
@@ -79,7 +82,7 @@ export function createVisitors(state, { hitPlayer, onNotice, burst }) {
       elder.labelUntil = state.time + 2.5;
       onNotice(elderLine);
     } else if (state.time >= elder.swingAt) {
-      hitPlayer(1, { ignoreProtection: true, ignoreArmor: true });
+      hitPlayer(elder.damage, { ignoreProtection: true, ignoreArmor: true });
       elder.swingUntil = state.time + 0.24;
       elder.phase = "door";
     }

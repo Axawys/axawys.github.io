@@ -214,6 +214,33 @@ const systems = [
       "        ▀▀▀▀▀",
     ],
   },
+  {
+    name: "Arch Linux",
+    os: "Arch Linux x86_64",
+    kernel: "Linux 6.14.9-arch1-1",
+    packages: "942 (pacman)",
+    shell: "bash 5.2.37",
+    desktop: "KDE Plasma 6.3.5",
+    wm: "KWin (Wayland)",
+    terminal: "Konsole 25.04.2",
+    host: "ThinkPad E14 Gen 4",
+    cpu: "AMD Ryzen 5 5625U (12) @ 4.30 GHz",
+    gpu: "AMD Radeon Graphics",
+    memory: "2.38 GiB / 15.09 GiB (16%)",
+    uptime: "1 hour, 35 mins",
+    color: "#86d9ff",
+    logo: [
+      "        ▄█▄",
+      "       ▄███▄",
+      "      ▄█████▄",
+      "     ▄███████▄",
+      "    ▄██▀ ▀████▄",
+      "   ▄██▀ ▄▄ ▀███▄",
+      "  ▄██▀ ████ ▀███▄",
+      " ▄█▀   ████   ▀██▄",
+      "▀▀     ▀▀▀▀     ▀▀",
+    ],
+  },
 ];
 
 const pentium4 = {

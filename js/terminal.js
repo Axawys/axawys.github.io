@@ -2,6 +2,7 @@ import { createFastfetch } from "./systems.js";
 import { tasks } from "./tasks.js";
 
 const byId = id => document.getElementById(id);
+const fetchTask = tasks.find(task => task.command === "fastfetch" && task.repeats);
 
 export function createTerminal(stations, systems, { onMaintenance, opsec }) {
   const dialog = byId("computer");
@@ -15,6 +16,7 @@ export function createTerminal(stations, systems, { onMaintenance, opsec }) {
   const usedCommands = new Set();
   let active;
   let selection;
+  let fetchRuns = 0;
 
   const sessions = stations.map((station, index) => {
     const system = systems[index];
@@ -200,6 +202,11 @@ export function createTerminal(stations, systems, { onMaintenance, opsec }) {
       case "fastfetch":
         addLine(createFastfetch(active.system, active.id.toLowerCase(), active.root ? "root" : "operator"));
         visited.add(active.station.number);
+        if (active.system.name === fetchTask.system && fetchRuns < fetchTask.repeats) {
+          fetchRuns++;
+          print(fetchTask.title + " · " + fetchRuns + "/" + fetchTask.repeats);
+          if (fetchRuns === fetchTask.repeats) complete(fetchTask, fetchTask, false);
+        }
         break;
       case "whoami":
         print(active.root ? "root" : "operator");

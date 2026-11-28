@@ -121,6 +121,7 @@ function commandSequence(task) {
   const command = document.createElement("code");
   command.textContent = task.command;
   instruction.append(command);
+  if (task.repeats) instruction.append(" ×" + task.repeats);
   if (task.alternative) {
     const alternative = document.createElement("code");
     alternative.textContent = task.alternative.command;
@@ -209,6 +210,11 @@ function openNote(target) {
     hintCopyStatus.textContent = "";
     const commands = [hint.setup, hint.command, hint.alternative?.command].filter(Boolean);
     hintCommands.replaceChildren(...commands.map(hintCommand));
+    if (hint.repeats) {
+      const instruction = document.createElement("p");
+      instruction.textContent = "Выполнить " + hint.repeats + " раз.";
+      hintCommands.append(instruction);
+    }
   }
   noteDialog.showModal();
 }

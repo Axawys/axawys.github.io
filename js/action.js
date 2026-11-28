@@ -20,6 +20,8 @@ const allyDuration = 60;
 const allySpeed = 138;
 const allyColor = "#91e6b2";
 const allyGift = 8;
+const outfitDuration = 30;
+const rackRepairTime = 0.85;
 const serverHp = 150;
 const serverCoins = 10;
 export const medkits = [
@@ -29,7 +31,7 @@ export const medkits = [
 ];
 const allyTypes = {
   ally: { kind: "furry", name: "Фурри-союзник", maxHp: 500, side: 1 },
-  gigacode: { kind: "agent", name: "gigacode", maxHp: robotTypes.agent.maxHp / 2, side: -1 },
+  gigacode: { kind: "agent", name: "gigacode", maxHp: robotTypes.agent.maxHp / 2, side: -1, repairsServers: true },
 };
 const celebrationDuration = 10;
 const fireworkColors = ["#ffb578", "#92c9ff", "#f7dc8e", "#e9a1df", "#9af0bd"];
@@ -68,7 +70,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
       const index = weapons.findIndex(weapon => weapon.id === spot.weaponId);
       return { ...spot, index, weapon: weapons[index] };
     }),
-    dead: false, invulnerable: 0, shake: 0, celebration: null, medal: false,
+    dead: false, invulnerable: 0, shake: 0, celebration: null, medal: false, outfitRemaining: 0,
     get ammo() { return arsenal.ammo; },
     get owned() { return arsenal.owned; },
     get weapon() { return arsenal.equipped; },
@@ -219,9 +221,14 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
   }
 
   function trigger(event, station, view) {
+    if (event === "arch-outfit") {
+      state.outfitRemaining = outfitDuration;
+      onNotice("Кошачьи ушки и чулки · 30 секунд");
+      return;
+    }
     const allyType = allyTypes[event];
     if (allyType) {
-      if (state.allies.some(ally => ally.kind === allyType.kind)) return;
+      if (state.allies.some(ally => ally.name === allyType.name)) return;
       const point = nearFree(station.x + allyType.side * 25, station.y + 45, 6) ?? nearFree(player.x, player.y, 6);
       if (!point) return;
       state.allies.push({
@@ -308,6 +315,52 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     return nearest;
   }
 
+  function moveAlly(ally, target, elapsed) {
+    const cell = nearestCell(target.x, target.y);
+    if (ally.targetCell !== cell) {
+      ally.targetCell = cell;
+      ally.field = makeField(cell);
+    }
+    if (pursue(ally, target, ally.field, allySpeed * elapsed)) ally.stride += elapsed * 13;
+  }
+
+  function repairNetwork(ally, elapsed) {
+    if (!ally.repair) {
+      let nearest;
+      let gap = Infinity;
+      for (const server of state.servers) {
+        if (server.hp === server.maxHp) continue;
+        const point = { x: server.x, y: server.box[3] + ally.radius + 2 };
+        const distance = Math.hypot(point.x - ally.x, point.y - ally.y);
+        if (distance < gap) {
+          nearest = { server, point };
+          gap = distance;
+        }
+      }
+      if (!nearest) return false;
+      ally.repair = nearest;
+    }
+
+    const { point, server } = ally.repair;
+    if (Math.hypot(point.x - ally.x, point.y - ally.y) > 4) {
+      moveAlly(ally, point, elapsed);
+      return true;
+    }
+    if (ally.repair.readyAt === undefined) {
+      ally.repair.readyAt = state.time + rackRepairTime;
+      burst(server.x, server.y - 8, ["#a8f4c4", "#ffe6a5"], 7, 45);
+    } else if (state.time >= ally.repair.readyAt) {
+      server.hp = server.maxHp;
+      server.flash = state.time + 0.18;
+      delete server.burn;
+      delete ally.repair;
+      shock(server.x, server.y - 5, 18, allyColor, 0.32);
+      burst(server.x, server.y - 8, ["#a8f4c4", "#e7ffe6"], 14, 68);
+      if (state.servers.every(rack => rack.hp === rack.maxHp)) onNotice("gigacode восстановил серверы Network");
+    }
+    return true;
+  }
+
   function advanceAlly(ally, elapsed, sceneElapsed) {
     if (ally.phase !== "guard") {
       if (walkOut(ally, elapsed, 110)) removeAlly(ally);
@@ -321,6 +374,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
         return;
       }
     }
+    if (ally.repairsServers && repairNetwork(ally, elapsed)) return;
 
     const threat = state.dead ? undefined : allyThreat(ally);
     if (threat && Math.hypot(ally.x - threat.x, ally.y - threat.y) < 24 && clearPath(ally, threat)) {
@@ -334,13 +388,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     }
 
     const target = threat ?? nearFree(player.x + ally.side * 22, player.y + 14, ally.radius);
-    if (!target) return;
-    const cell = nearestCell(target.x, target.y);
-    if (ally.targetCell !== cell) {
-      ally.targetCell = cell;
-      ally.field = makeField(cell);
-    }
-    if (pursue(ally, target, ally.field, allySpeed * elapsed)) ally.stride += elapsed * 13;
+    if (target) moveAlly(ally, target, elapsed);
   }
 
   function fieldTowardPlayer({ x, y }) {
@@ -522,6 +570,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
 
   function update(elapsed, holding, pressed = false, sceneElapsed = elapsed) {
     state.time += elapsed;
+    state.outfitRemaining = Math.max(0, state.outfitRemaining - sceneElapsed);
     state.invulnerable = Math.max(0, state.invulnerable - elapsed);
     state.shake = Math.max(0, state.shake - elapsed * 2.7);
     for (const event of state.pending) {

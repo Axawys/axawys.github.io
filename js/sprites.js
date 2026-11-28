@@ -139,7 +139,7 @@ function playerStatus(player, weapon) {
   const height = weapon ? 41 : 30;
   const armorLabel = "Броня " + player.armor;
   const half = Math.max(21, Math.ceil(Math.max(textWidth(weapon?.name ?? ""), textWidth(armorLabel)) / 2) + 4);
-  return { x: Math.round(player.x), y: Math.round(player.y) - 24 - height, half, height, armorLabel };
+  return { x: Math.round(player.x), y: Math.round(player.y) - (player.outfit ? 30 : 24) - height, half, height, armorLabel };
 }
 
 export function drawPlayer(ctx, player, action, time) {
@@ -158,6 +158,15 @@ export function drawPlayer(ctx, player, action, time) {
   box(ctx, "#182820", x - 5, y - 6, 10, 7);
   box(ctx, "#3d4c46", x - 4, y - 5 + bob, 3, 5);
   box(ctx, "#486157", x + 1, y - 5 - bob, 3, 5);
+  if (player.outfit) {
+    for (const side of [-1, 1]) {
+      const legX = x + side * 3 - 1;
+      const legY = y - 5 - side * bob;
+      box(ctx, "#3e2b4c", legX, legY, 3, 5);
+      box(ctx, "#e5b2d7", legX, legY, 3, 1);
+      box(ctx, "#a986bd", legX, legY + 2, 3, 1);
+    }
+  }
   box(ctx, "#9b603a", x - 6, y - 12 + bob, 12, 7);
   box(ctx, hit ? "#f6ddd0" : "#d29659", x - 4, y - 13 + bob, 8, 8);
   box(ctx, "#a66a40", x - 5, y - 5 + bob, 10, 1);
@@ -175,6 +184,15 @@ export function drawPlayer(ctx, player, action, time) {
     box(ctx, "#483328", face + 1, y - 15 + bob, 1, 1);
     box(ctx, "#483328", face + 4, y - 15 + bob, 1, 1);
   }
+  if (player.outfit) {
+    box(ctx, "#674865", x - 5, y - 21 + bob, 10, 2);
+    for (const side of [-1, 1]) {
+      const earX = x + side * 5;
+      box(ctx, "#432a47", earX - 2, y - 25 + bob, 5, 5);
+      box(ctx, "#432a47", earX + side - 1, y - 27 + bob, 3, 3);
+      box(ctx, "#efaaca", earX + side - 1, y - 25 + bob, 2, 3);
+    }
+  }
 
   if (action.medal) {
     line(ctx, "#c66c59", x - 3, y - 13 + bob, x, y - 9 + bob);
@@ -186,14 +204,15 @@ export function drawPlayer(ctx, player, action, time) {
 
   const weapon = action.armed ? action.weapon : null;
   const status = playerStatus(player, weapon);
+  const statusBottom = status.y + status.height;
   box(ctx, "#111e17", x - status.half, status.y, status.half * 2, status.height);
   if (weapon) label(ctx, weapon.name, x, status.y + 2, weapon.color);
-  label(ctx, player.hp + " HP", x, y - 51, "#fff3d8");
-  box(ctx, "#653b39", x - 17, y - 42, 34, 3);
-  box(ctx, player.hp > 35 ? "#8fd39b" : "#fa8d79", x - 17, y - 42, Math.ceil(34 * player.hp / player.maxHp), 3);
-  label(ctx, status.armorLabel, x, y - 37, "#b6ddfb");
-  box(ctx, "#30526a", x - 17, y - 28, 34, 3);
-  box(ctx, "#72b9ed", x - 17, y - 28, Math.ceil(34 * player.armor / player.maxArmor), 3);
+  label(ctx, player.hp + " HP", x, statusBottom - 27, "#fff3d8");
+  box(ctx, "#653b39", x - 17, statusBottom - 18, 34, 3);
+  box(ctx, player.hp > 35 ? "#8fd39b" : "#fa8d79", x - 17, statusBottom - 18, Math.ceil(34 * player.hp / player.maxHp), 3);
+  label(ctx, status.armorLabel, x, statusBottom - 13, "#b6ddfb");
+  box(ctx, "#30526a", x - 17, statusBottom - 4, 34, 3);
+  box(ctx, "#72b9ed", x - 17, statusBottom - 4, Math.ceil(34 * player.armor / player.maxArmor), 3);
 }
 
 export function drawWeapon(ctx, player, aim, weapon, laser) {
@@ -293,6 +312,11 @@ export function drawAlly(ctx, ally, time) {
   box(ctx, "#17382a", x - 3, y - 2, 7, 7);
   box(ctx, "#a8f4c4", x, y - 1, 1, 5);
   box(ctx, "#a8f4c4", x - 2, y + 1, 5, 1);
+  if (ally.repair?.readyAt && Math.floor(time * 24) % 2) {
+    const { server } = ally.repair;
+    line(ctx, "#a8f4c4", x, feet - 9, server.x, server.y + 2);
+    box(ctx, "#f0ffd0", server.x - 1, server.y, 3, 3);
+  }
 }
 
 export function drawBurningRobot(ctx, robot, time) {
