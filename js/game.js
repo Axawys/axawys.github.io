@@ -41,6 +41,7 @@ const renderer = createRenderer(canvas);
 const moveStick = createJoystick(canvas, byId("move-joystick"), "left");
 const aimStick = createJoystick(canvas, byId("aim-joystick"), "right");
 const achievementTasks = tasks.filter(task => task.achievement);
+const finaleTasks = achievementTasks.filter(task => task.finale !== false);
 const achievements = createAchievements([...achievementTasks, finaleAchievement], () => canvas.focus({ preventScroll: true }));
 const action = createAction(showNotice, () => achievements.unlock(finaleAchievement));
 const shop = createShop(action, player, () => canvas.focus({ preventScroll: true }));
@@ -54,6 +55,7 @@ const terminal = createTerminal(stations, systems, {
   },
 });
 
+weaponSlots.style.setProperty("--weapon-count", weapons.length);
 const slotButtons = weapons.map((weapon, index) => {
   const slot = document.createElement("button");
   const key = document.createElement("kbd");
@@ -306,8 +308,8 @@ window.addEventListener("keydown", event => {
     return;
   }
   if (achievements.isOpen || action.state.dead) return;
-  const weaponKey = /^(?:Digit|Numpad)([1-6])$/.exec(event.code);
-  if (weaponKey && action.state.armed) {
+  const weaponKey = /^(?:Digit|Numpad)([1-9])$/.exec(event.code);
+  if (weaponKey && Number(weaponKey[1]) <= weapons.length && action.state.armed) {
     event.preventDefault();
     action.selectWeapon(Number(weaponKey[1]) - 1);
     return;
@@ -461,7 +463,7 @@ function frame(time) {
   canvas.classList.toggle("armed", action.state.armed);
   if (!action.state.medal && !action.state.celebration) {
     if (achievements.has(finaleAchievement.event)) action.state.medal = true;
-    else if (!paused && achievementTasks.every(task => achievements.has(task.event))) action.startCelebration();
+    else if (!paused && finaleTasks.every(task => achievements.has(task.event))) action.startCelebration();
   }
   updateWeaponSlots();
   updateAllyTimers();

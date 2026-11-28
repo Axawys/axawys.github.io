@@ -1,6 +1,6 @@
 import { label } from "./pixel-font.js";
 import { box } from "./pixels.js";
-import { drawAlly, drawBlastZones, drawBurningRobot, drawCoinDrop, drawEffects, drawHandshake, drawPlayer, drawRobot, drawRobotTags, drawSupply, drawVisitor, drawWeapon } from "./sprites.js";
+import { drawAlly, drawBlastZones, drawBurningRobot, drawCoinDrop, drawEffects, drawFrozenRobot, drawHandshake, drawPlayer, drawRobot, drawRobotTags, drawSupply, drawVisitor, drawWeapon } from "./sprites.js";
 
 export const width = 1220;
 export const height = 966;
@@ -33,6 +33,7 @@ export const supplySpots = [
   { x: 907, y: 644, weaponId: "grenade", rounds: 2, unlock: true },
   { x: 1021, y: 481, weaponId: "flame", rounds: 10, unlock: true },
   { x: 1114, y: 266, weaponId: "bfg", rounds: 1, unlock: true },
+  { x: 575, y: 805, weaponId: "freezer", rounds: 16, unlock: true },
   { x: 408, y: 523, weaponId: "rifle", rounds: 16 },
   { x: 272, y: 305, weaponId: "rifle", rounds: 16 },
   { x: 768, y: 82, weaponId: "rifle", rounds: 16 },
@@ -44,6 +45,9 @@ export const supplySpots = [
   { x: 1002, y: 288, weaponId: "flame", rounds: 12 },
   { x: 766, y: 653, weaponId: "flame", rounds: 12 },
   { x: 246, y: 601, weaponId: "flame", rounds: 12 },
+  { x: 458, y: 480, weaponId: "freezer", rounds: 10 },
+  { x: 925, y: 337, weaponId: "freezer", rounds: 10 },
+  { x: 795, y: 680, weaponId: "freezer", rounds: 10 },
   { x: 550, y: 696, kind: "armor", amount: 25 },
   { x: 197, y: 479, kind: "armor", amount: 25 },
   { x: 611, y: 107, kind: "armor", amount: 50 },
@@ -284,6 +288,7 @@ export function createRenderer(canvas) {
       drawRobot(context, robot, time);
       context.globalAlpha = 1;
       drawBurningRobot(context, robot, time);
+      if (robot.frozenUntil > time) drawFrozenRobot(context, robot);
     } });
     for (const ally of action.allies) layers.push({ depth: ally.y, draw: () => drawAlly(context, ally, time) });
     for (const visitor of action.visitors) layers.push({

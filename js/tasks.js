@@ -20,7 +20,10 @@ export const tasks = [
   },
   { system: "Debian", title: "Обновить Debian", command: "sudo apt update && sudo apt upgrade", event: "elder" },
   { system: "Kali Linux", title: "Провести пентест", command: "sudo apt install opsec", event: "opsec" },
-  { system: "Arch Linux", title: "Полюбоваться фетчем", command: "fastfetch", repeats: 5, event: "arch-outfit" },
+  {
+    system: "Arch Linux", title: "Полюбоваться фетчем", command: "fastfetch", repeats: 5, event: "arch-outfit",
+    achievement: "Настоящий райсер", finale: false,
+  },
 ];
 
 export const finaleAchievement = { system: "Linux Lab", event: "linux-user", achievement: "Настоящий линуксоид" };

@@ -78,8 +78,9 @@ const weaponIcons = {
 };
 
 export function drawWeaponIcon(ctx, weapon) {
-  const palette = { o: "#0b1811", x: weapon.color, "+": "#f0e8cd" };
-  for (const [y, row] of weaponIcons[weapon.id].entries()) {
+  const palette = { o: "#0b1811", x: weapon.color, "+": weapon.freezeDuration ? "#d6f4ff" : "#f0e8cd" };
+  const icon = weaponIcons[weapon.kind === "spray" ? "flame" : weapon.id];
+  for (const [y, row] of icon.entries()) {
     for (let x = 0; x < row.length; x++) {
       const color = palette[row[x]];
       if (color) box(ctx, color, x + 1, y + 1, 1, 1);
@@ -221,7 +222,7 @@ export function drawWeapon(ctx, player, aim, weapon, laser) {
     if (!aim.visible || weapon.kind === "grenade") return;
     const aimDistance = Math.hypot(aim.x - x, aim.y - y);
     if (aimDistance < weapon.length + 2) return;
-    const distance = weapon.kind === "flame" ? Math.min(weapon.range, aimDistance) : aimDistance;
+    const distance = weapon.kind === "spray" ? Math.min(weapon.range, aimDistance) : aimDistance;
     const endX = x + dx * distance;
     const endY = y + dy * distance;
     line(ctx, "#ff404490", muzzleX, muzzleY, endX, endY);
@@ -238,7 +239,7 @@ export function drawWeapon(ctx, player, aim, weapon, laser) {
   line(ctx, "#161d1b", x + dx * stock - 1, y + dy * stock - 1, x + dx * body - 1, y + dy * body - 1, weapon.thickness + 1);
   line(ctx, weapon.color, x + dx * stock, y + dy * stock, x + dx * body, y + dy * body, weapon.thickness);
   line(ctx, "#a8b7a5", x + dx * body, y + dy * body, muzzleX, muzzleY, weapon.kind === "rocket" ? 3 : 1);
-  pixels(ctx, "#e44948", muzzleX, muzzleY, 2);
+  pixels(ctx, weapon.freezeDuration ? "#b2e7ff" : "#e44948", muzzleX, muzzleY, 2);
 }
 
 function drawFurry(ctx, robot, time, friendly = false) {
@@ -331,6 +332,21 @@ export function drawBurningRobot(ctx, robot, time) {
     box(ctx, "#ffb34e", x - 1, y - height, 3, height);
     pixels(ctx, "#ffe5a1", x, y - height + 2, 2);
     if ((phase + index) % 3 !== 0) pixels(ctx, "#ffcb6d", x + 1, y - height - 4, 1);
+  }
+}
+
+export function drawFrozenRobot(ctx, robot) {
+  const x = Math.round(robot.x);
+  const feet = Math.round(robot.y);
+  const top = feet - robotTopOffset[robot.kind];
+  const half = robot.kind === "swarm" ? 7 : 13;
+  box(ctx, "#5ba9e256", x - half, top + 3, half * 2, feet - top);
+  box(ctx, "#a6e7ff", x - half + 2, top + 3, half * 2 - 4, 1);
+  line(ctx, "#75c5ed", x - half, top + 6, x - half, feet - 2, 2);
+  line(ctx, "#bdefff", x + half - 2, top + 5, x + half - 2, feet, 2);
+  line(ctx, "#528fbc", x - half + 2, feet + 2, x + half - 2, feet + 2, 2);
+  for (const [offset, rise] of [[-3, 7], [3, 3]]) {
+    line(ctx, "#def9ff", x + offset, feet - rise, x + offset + 3, feet - rise - 3);
   }
 }
 

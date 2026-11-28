@@ -162,7 +162,7 @@ export function createVisitors(state, { hitPlayer, onNotice, burst }) {
         chase = undefined;
         return;
       }
-      if (walkOut(furry, elapsed, 205)) {
+      if (!(furry.frozenUntil > state.time) && walkOut(furry, elapsed, 205)) {
         actors.splice(index, 1);
         chase.furryExited = true;
       }

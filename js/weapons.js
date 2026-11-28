@@ -5,16 +5,17 @@ export const weapons = [
   { id: "pistol", kind: "bullet", name: "Пистолет", capacity: Infinity, length: 8, thickness: 2, color: "#d8d6bd", range: 430, damage: 38, cooldown: 0.26 },
   { id: "launcher", kind: "rocket", name: "Гранатомёт", capacity: 20, length: 18, thickness: 5, color: "#d7a67d", range: 320, radius: 44, damage: 108, cooldown: 0.7, shop: { rounds: 3, cost: 12 } },
   { id: "grenade", kind: "grenade", name: "Гранаты", capacity: 6, length: 7, color: "#aaca88", range: 155, radius: 55, damage: 128, cooldown: 0.78, shop: { rounds: 2, cost: 12 } },
-  { id: "flame", kind: "flame", name: "Огнемёт", capacity: 40, length: 15, thickness: 4, color: "#f9b06e", range: 96, damage: 12, cooldown: 0.09, automatic: true, shop: { rounds: 12, cost: 10 } },
+  { id: "flame", kind: "spray", name: "Огнемёт", capacity: 40, length: 15, thickness: 4, color: "#f9b06e", range: 96, damage: 12, cooldown: 0.09, automatic: true, sprayColors: ["#ffe2a0", "#ffb05d", "#ed7647"], shop: { rounds: 12, cost: 10 } },
   { id: "rifle", kind: "bullet", name: "Автомат", capacity: 50, length: 13, thickness: 3, color: "#a8b7a5", range: 560, damage: 24, cooldown: 0.105, automatic: true, shop: { rounds: 20, cost: 12 } },
   { id: "bfg", kind: "rocket", name: "BFG", capacity: 1, refillable: false, length: 21, thickness: 6, color: "#9aee8f", range: 440, radius: 150, damage: 10000, cooldown: 0.9 },
+  { id: "freezer", kind: "spray", name: "Фризер", capacity: 30, length: 15, thickness: 4, color: "#73c7fb", range: 96, damage: 0, freezeDuration: 2.5, cooldown: 0.16, automatic: true, sprayColors: ["#e3f9ff", "#8bdbff", "#479bdf"], shop: { rounds: 10, cost: 10 } },
 ];
 
 const burnDuration = 3;
 const burnInterval = 0.5;
 const burnDamage = 18;
-const flameStartWidth = 8;
-const flameSpread = 0.31;
+const sprayStartWidth = 8;
+const spraySpread = 0.31;
 
 // Bounds relative to the sprite's feet, including the outer frames of its walk cycle.
 const hitboxes = {
@@ -46,16 +47,16 @@ export function traceHitbox({ dx, dy }, left, top, right, bottom, range) {
   return entry <= exit ? entry : null;
 }
 
-function flameOverlaps({ dx, dy }, left, top, right, bottom, range) {
-  const farWidth = flameStartWidth + range * flameSpread;
+function sprayOverlaps({ dx, dy }, left, top, right, bottom, range) {
+  const farWidth = sprayStartWidth + range * spraySpread;
   const endX = range * dx;
   const endY = range * dy;
   const offsetX = Math.abs(dy);
   const offsetY = Math.abs(dx);
-  if (right < Math.min(-offsetX * flameStartWidth, endX - offsetX * farWidth)
-    || left > Math.max(offsetX * flameStartWidth, endX + offsetX * farWidth)
-    || bottom < Math.min(-offsetY * flameStartWidth, endY - offsetY * farWidth)
-    || top > Math.max(offsetY * flameStartWidth, endY + offsetY * farWidth)) return false;
+  if (right < Math.min(-offsetX * sprayStartWidth, endX - offsetX * farWidth)
+    || left > Math.max(offsetX * sprayStartWidth, endX + offsetX * farWidth)
+    || bottom < Math.min(-offsetY * sprayStartWidth, endY - offsetY * farWidth)
+    || top > Math.max(offsetY * sprayStartWidth, endY + offsetY * farWidth)) return false;
 
   const centerX = (left + right) / 2;
   const centerY = (top + bottom) / 2;
@@ -65,12 +66,12 @@ function flameOverlaps({ dx, dy }, left, top, right, bottom, range) {
   const depthExtent = halfWidth * offsetY + halfHeight * offsetX;
   if (depth + depthExtent < 0 || depth - depthExtent > range) return false;
 
-  // A rectangle must overlap both sloping sides of the flame cone.
+  // A rectangle must overlap both sloping sides of the spray cone.
   for (const side of [-1, 1]) {
-    const normalX = -dy * side - dx * flameSpread;
-    const normalY = dx * side - dy * flameSpread;
+    const normalX = -dy * side - dx * spraySpread;
+    const normalY = dx * side - dy * spraySpread;
     const nearest = centerX * normalX + centerY * normalY - halfWidth * Math.abs(normalX) - halfHeight * Math.abs(normalY);
-    if (nearest > flameStartWidth) return false;
+    if (nearest > sprayStartWidth) return false;
   }
   return true;
 }
@@ -270,7 +271,7 @@ export function createWeapons(state, player, burst, shock, damageAlly = () => {}
     });
   }
 
-  function fireFlame(ray, weapon) {
+  function fireSpray(ray, weapon) {
     const { x, y, dx, dy } = ray;
     for (let i = 0; i < 12; i++) {
       const spread = (Math.random() - 0.5) * 0.64;
@@ -286,19 +287,24 @@ export function createWeapons(state, player, burst, shock, damageAlly = () => {}
         x: x + vx * start, y: y + vy * start,
         vx: vx * (distance - start) / life, vy: vy * (distance - start) / life,
         size: 3 + Math.random() * 4, life, total: life, smoke: false,
-        color: ["#ffe2a0", "#ffb05d", "#ed7647"][i % 3],
+        color: weapon.sprayColors[i % weapon.sprayColors.length],
       });
     }
-    for (const target of damageableTargets()) {
+    const targets = weapon.freezeDuration ? state.robots : damageableTargets();
+    for (const target of targets) {
       if (target.reviveAt) continue;
       const vx = target.x - x;
       const spriteX = Math.round(target.x) - x;
       const spriteY = Math.round(target.y) - y;
       if (!hitboxes[target.kind].some(([left, top, right, bottom]) =>
-        flameOverlaps(ray, spriteX + left, spriteY + top, spriteX + right, spriteY + bottom, weapon.range))) continue;
+        sprayOverlaps(ray, spriteX + left, spriteY + top, spriteX + right, spriteY + bottom, weapon.range))) continue;
       const groundY = target.y + (target.kind === "homingRocket" ? 9 : 0) - player.y;
       const distance = Math.hypot(vx, groundY);
       if (distance > 1 && wallDistance(x, player.y, vx / distance, groundY / distance, distance, target.box) < distance) continue;
+      if (weapon.freezeDuration) {
+        target.frozenUntil = state.time + weapon.freezeDuration;
+        continue;
+      }
       damageTarget(target, weapon.damage, target.x, target.y - target.eye);
       if (target.hp <= 0 || target.kind === "homingRocket") continue;
       target.burn ??= { nextTick: state.time + burnInterval };
@@ -359,7 +365,7 @@ export function createWeapons(state, player, burst, shock, damageAlly = () => {}
       case "bullet": fireBullet(ray, weapon); break;
       case "rocket": launchRocket(ray, weapon); break;
       case "grenade": throwGrenade(weapon); break;
-      case "flame": fireFlame(ray, weapon); break;
+      case "spray": fireSpray(ray, weapon); break;
     }
     cooldown = weapon.cooldown;
   }

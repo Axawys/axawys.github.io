@@ -444,8 +444,9 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
 
   function advanceRobots(elapsed) {
     const field = fieldTowardPlayer(player);
+    const cannotMove = robot => robot.reviveAt || robot.frozenUntil > state.time || visitors.isFleeing(robot);
     for (const robot of state.robots) {
-      if (robot.reviveAt || visitors.isFleeing(robot) || state.time < robot.ready) continue;
+      if (cannotMove(robot) || state.time < robot.ready) continue;
       const gap = Math.hypot(player.x - robot.x, player.y - robot.y);
       const ranged = robot.phase === 2;
       const clear = (ranged || robot.nextBullet !== undefined) && hostileFire.fire(robot, gap);
@@ -483,10 +484,10 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     }
     for (let i = 0; i < state.robots.length; i++) {
       const first = state.robots[i];
-      if (first.reviveAt || visitors.isFleeing(first)) continue;
+      if (cannotMove(first)) continue;
       for (let j = i + 1; j < state.robots.length; j++) {
         const second = state.robots[j];
-        if (second.reviveAt || visitors.isFleeing(second)) continue;
+        if (cannotMove(second)) continue;
         const dx = second.x - first.x;
         const dy = second.y - first.y;
         const gap = Math.hypot(dx, dy);
