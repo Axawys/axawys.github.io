@@ -6,9 +6,9 @@ const rocketInterval = 7;
 const rocketTurnRate = 3.2;
 
 export function createHostileFire(state, player, hitPlayer, burst, shock) {
-  function arm(robot) {
-    robot.nextBullet = state.time + 0.55;
-    robot.nextRocket = state.time + rocketInterval;
+  function arm(robot, { rockets = true, delay = 0.55 } = {}) {
+    robot.nextBullet = state.time + delay;
+    if (rockets) robot.nextRocket = state.time + rocketInterval;
   }
 
   function fire(robot, gap) {
@@ -24,7 +24,7 @@ export function createHostileFire(state, player, hitPlayer, burst, shock) {
       state.hostileBullets.push({ x, y, dx, dy, damage: 10, speed: 450, life: bulletRange / 450 });
       burst(x + dx * 7, y + dy * 7, ["#ffdc99", "#ff966b"], 4, 57);
     }
-    if (state.time >= robot.nextRocket) {
+    if (robot.nextRocket !== undefined && state.time >= robot.nextRocket) {
       robot.nextRocket += rocketInterval;
       state.hostileRockets.push({
         x, y, angle, dx, dy, kind: "homingRocket", name: "Ракета", color: "#ff9e8a", eye: 0,

@@ -292,7 +292,9 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
       const point = nearFree(x + dx, y + dy, type.radius);
       if (!point) continue;
       const speed = type.speed + (kind === "swarm" ? (index % 4) * 4 - 6 : 0);
-      state.robots.push({ ...type, ...identity, ...point, kind, speed, hp: type.maxHp, stride: 0, flash: 0, ready: state.time + 0.45 });
+      const robot = { ...type, ...identity, ...point, kind, speed, hp: type.maxHp, stride: 0, flash: 0, ready: state.time + 0.45 };
+      if (kind === "agent") hostileFire.arm(robot, { rockets: false, delay: 0.55 + index * 0.35 });
+      state.robots.push(robot);
       weaponsUnlocked = true;
     }
     const color = robotTypes[event].color;
@@ -446,7 +448,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
       if (robot.reviveAt || visitors.isFleeing(robot) || state.time < robot.ready) continue;
       const gap = Math.hypot(player.x - robot.x, player.y - robot.y);
       const ranged = robot.phase === 2;
-      const clear = ranged && hostileFire.fire(robot, gap);
+      const clear = (ranged || robot.nextBullet !== undefined) && hostileFire.fire(robot, gap);
       const interception = interceptingAlly(robot, gap);
       if (interception) {
         const { ally, gap: allyGap } = interception;
@@ -469,7 +471,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
         hitPlayer(robot.damage);
         if (!ranged) continue;
       }
-      if (clear && gap <= 138) {
+      if (ranged && clear && gap <= 138) {
         if (gap > 0 && gap < 87) {
           const travel = Math.min(robot.speed * elapsed, 87 - gap) / gap;
           if (moveBody(robot, (robot.x - player.x) * travel, (robot.y - player.y) * travel)) robot.stride += elapsed * 13;
