@@ -1,7 +1,7 @@
 import { label, textWidth } from "./pixel-font.js";
 import { box, gunRay, line, pixels } from "./pixels.js";
 
-const robotTopOffset = { swarm: 10, spider: 17, agent: 26, walker: 33, furry: 36, homingRocket: 7, server: 20 };
+const robotTopOffset = { swarm: 10, spider: 17, agent: 26, walker: 33, furry: 36, crutch: 35, homingRocket: 7, server: 20 };
 const weaponIcons = {
   pistol: [
     "....................",
@@ -124,12 +124,20 @@ export function drawSupply(ctx, { x, y, unlock, weapon, kind, amount }) {
   }
 }
 
-export function drawCoinDrop(ctx, coin, time) {
-  const travel = Math.min(1, Math.max(0, 1 - (coin.landedAt - time) / 0.25));
-  const x = Math.round(coin.fromX + (coin.x - coin.fromX) * travel);
-  const ground = Math.round(coin.fromY + (coin.y - coin.fromY) * travel);
+export function drawCurrencyDrop(ctx, drop, time) {
+  const travel = Math.min(1, Math.max(0, 1 - (drop.landedAt - time) / 0.25));
+  const x = Math.round(drop.fromX + (drop.x - drop.fromX) * travel);
+  const ground = Math.round(drop.fromY + (drop.y - drop.fromY) * travel);
   const y = ground - Math.round(11 * Math.sin(travel * Math.PI));
   box(ctx, "#14241a", x - 5, ground + 2, 11, 3);
+  if (drop.currency === "tokens") {
+    box(ctx, "#4d376d", x - 4, y - 3, 9, 7);
+    box(ctx, "#b894ec", x - 3, y - 4, 7, 7);
+    box(ctx, "#b894ec", x - 1, y - 5, 3, 9);
+    box(ctx, "#eee0ff", x - 1, y - 3, 3, 1);
+    box(ctx, "#654892", x, y - 2, 1, 4);
+    return;
+  }
   box(ctx, "#83531f", x - 4, y - 3, 9, 7);
   box(ctx, "#e0ac48", x - 3, y - 4, 7, 7);
   box(ctx, "#ffe39a", x - 2, y - 3, 5, 1);
@@ -350,7 +358,39 @@ export function drawFrozenRobot(ctx, robot) {
   }
 }
 
+function drawCrutchRobot(ctx, robot, time) {
+  const x = Math.round(robot.x);
+  const y = Math.round(robot.y);
+  const step = Math.round(Math.sin(robot.stride * 1.45) * 3);
+  box(ctx, "#14231bd0", x - 13, y - 1, 26, 4);
+  for (const side of [-1, 1]) {
+    const shoulder = x + side * 8;
+    const tip = x + side * 14;
+    const foot = y + side * step;
+    box(ctx, "#54403a", shoulder - 5, y - 24, 10, 5);
+    box(ctx, "#b39173", shoulder - 4, y - 24, 8, 2);
+    line(ctx, "#c4ccc5", shoulder - 3, y - 20, tip, foot - 6, 2);
+    line(ctx, "#97aaa6", shoulder + 3, y - 20, tip, foot - 6, 2);
+    const grip = Math.round((shoulder + tip) / 2);
+    box(ctx, "#9f7d66", grip - 3, y - 14, 7, 2);
+    line(ctx, "#a9b6af", tip, foot - 7, tip, foot, 2);
+    box(ctx, "#31352e", tip - 2, foot - 1, 5, 3);
+  }
+  box(ctx, "#3a3449", x - 8, y - 23, 16, 13);
+  box(ctx, "#6e6281", x - 7, y - 22, 14, 8);
+  box(ctx, "#30293d", x - 9, y - 33, 18, 13);
+  box(ctx, time < robot.flash ? "#edfcf6" : "#a69bb7", x - 8, y - 32, 16, 2);
+  box(ctx, "#4b435b", x - 8, y - 30, 16, 8);
+  box(ctx, "#272335", x - 6, y - 29, 12, 6);
+  box(ctx, "#a6f1c0", x - 4, y - 27, 2, 2);
+  box(ctx, "#a6f1c0", x + 2, y - 27, 2, 2);
+}
+
 export function drawRobot(ctx, robot, time) {
+  if (robot.kind === "crutch") {
+    drawCrutchRobot(ctx, robot, time);
+    return;
+  }
   if (robot.kind === "furry") {
     drawFurry(ctx, robot, time);
     return;

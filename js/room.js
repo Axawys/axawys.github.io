@@ -1,6 +1,6 @@
 import { label } from "./pixel-font.js";
 import { box } from "./pixels.js";
-import { drawAlly, drawBlastZones, drawBurningRobot, drawCoinDrop, drawEffects, drawFrozenRobot, drawHandshake, drawPlayer, drawRobot, drawRobotTags, drawSupply, drawVisitor, drawWeapon } from "./sprites.js";
+import { drawAlly, drawBlastZones, drawBurningRobot, drawCurrencyDrop, drawEffects, drawFrozenRobot, drawHandshake, drawPlayer, drawRobot, drawRobotTags, drawSupply, drawVisitor, drawWeapon } from "./sprites.js";
 
 export const width = 1220;
 export const height = 966;
@@ -26,6 +26,11 @@ export const player = { ...playerStart, facing: "north", moving: false, stride: 
 export const noteSpots = [
   [573, 5], [655, 23], [566, 69], [654, 91], [610, -50], [608, 149],
 ].map(([x, offset]) => ({ x, y: breakAreaTop + offset, kind: "note" }));
+
+export const tokenSpots = [
+  [600, 778], [898, 858], [203, 784], [255, 505], [421, 360],
+  [191, 229], [590, 93], [932, 234], [1128, 521], [981, 688],
+].map(([x, y]) => ({ x, y, value: 5 }));
 
 export const supplySpots = [
   { x: 635, y: 695, weaponId: "rifle", rounds: 12, unlock: true },
@@ -74,6 +79,7 @@ function kiosk(column, row, catalog) {
 }
 
 const kiosks = [kiosk(32, 24, "ammo"), kiosk(27, 24, "medkits")];
+export const tokenComputer = { ...item("token-pc", 540, 850, [-38, -7, 38, 17]), cost: 100 };
 export const networkRacks = [[1029, 148], [1061, 148], [1093, 148], [1125, 148], [1111, 201], [1143, 201]]
   .map(([x, y]) => item("server", x, y, [-13, -13, 13, 15]));
 
@@ -120,6 +126,7 @@ const furniture = [
 ];
 
 const obstacles = [
+  tokenComputer.box,
   ...furniture.map(({ box: bounds }) => bounds),
   ...stations.flatMap(({ x, y }) => [
     [x - 34, y - 4, x + 34, y + 20],
@@ -176,8 +183,10 @@ export function movePlayer(dx, dy, elapsed) {
   if (player.moving) player.stride += elapsed;
 }
 
-export function nearestInteraction(notes) {
+export function nearestInteraction(notes, tokenComputerUsed) {
   return notes.find(note => Math.hypot(player.x - note.x, player.y - note.y) < 23)
+    ?? (!tokenComputerUsed && Math.abs(player.x - tokenComputer.x) <= 35
+      && player.y >= tokenComputer.y + 20 && player.y <= tokenComputer.y + 47 ? tokenComputer : undefined)
     ?? kiosks.find(kiosk => Math.abs(player.x - kiosk.x) <= 27 && player.y >= kiosk.y + 13 && player.y <= kiosk.y + 36)
     ?? stations.find(station => !station.offline && !station.busy && Math.abs(player.x - station.x) <= 29
     && player.y >= station.y + 20 && player.y <= station.y + 53);
@@ -278,7 +287,10 @@ export function createRenderer(canvas) {
     }
     for (const note of notes) layers.push({ depth: note.y, draw: () => drawNote(context, note, nearby === note) });
     for (const supply of action.supplies) layers.push({ depth: supply.y, draw: () => drawSupply(context, supply) });
-    for (const coin of action.coinDrops) layers.push({ depth: coin.y, draw: () => drawCoinDrop(context, coin, time) });
+    for (const drop of action.currencyDrops) layers.push({ depth: drop.y, draw: () => drawCurrencyDrop(context, drop, time) });
+    layers.push({
+      depth: tokenComputer.box[3], draw: () => drawTokenComputer(context, action.tokens, action.tokenComputerUsed),
+    });
     for (const server of action.servers) layers.push({ depth: server.box[3], draw: () => {
       drawFurniture(context, server, time * 1000);
       drawBurningRobot(context, server, time);
@@ -507,6 +519,39 @@ function drawDesk(ctx, { number, id, x, y, screen, offline }, near, discovered, 
   box(ctx, "#293f34", x - 5, y + 31, 10, 3);
 }
 
+
+function drawTokenComputer(ctx, tokens, used) {
+  const { x, y, cost } = tokenComputer;
+  box(ctx, "#18271eae", x - 41, y + 11, 85, 10);
+  box(ctx, "#1d2824", x - 38, y - 7, 76, 24);
+  box(ctx, "#536863", x - 34, y - 7, 68, 10);
+  box(ctx, "#314641", x - 34, y + 3, 68, 9);
+  box(ctx, "#435751", x - 5, y + 5, 10, 3);
+  if (used) {
+    box(ctx, "#2a3533", x - 19, y - 6, 38, 7);
+    box(ctx, "#8fa6a0", x - 12, y - 5, 4, 2);
+    box(ctx, "#7b8f83", x + 8, y - 4, 6, 1);
+    return;
+  }
+
+  box(ctx, "#2d2940", x - 26, y - 29, 52, 29);
+  box(ctx, "#9184a6", x - 25, y - 28, 50, 3);
+  box(ctx, "#564b68", x - 25, y - 25, 50, 22);
+  box(ctx, "#211f34", x - 20, y - 23, 40, 17);
+  box(ctx, "#342e4c", x - 18, y - 21, 36, 13);
+  label(ctx, "TKN", x, y - 19, "#d9c4ff");
+  box(ctx, "#2a2639", x + 28, y - 16, 9, 17);
+  box(ctx, "#7e7091", x + 29, y - 15, 7, 3);
+  box(ctx, "#c1a5f8", x + 31, y - 7, 3, 2);
+  box(ctx, "#97a8a1", x - 12, y + 1, 24, 4);
+  box(ctx, "#62776f", x - 9, y + 2, 18, 1);
+
+  const filled = Math.min(tokens, cost);
+  box(ctx, "#2a2337", x - 48, y - 49, 96, 17);
+  label(ctx, filled + "/" + cost + " ТОКЕНОВ", x, y - 47, "#e6d5ff");
+  box(ctx, "#4b3e5e", x - 34, y - 38, 68, 4);
+  if (filled > 0) box(ctx, filled === cost ? "#a5e7bc" : "#ba94ed", x - 34, y - 38, Math.ceil(68 * filled / cost), 4);
+}
 
 function drawFurniture(ctx, { x, y, kind, box: bounds, hp, maxHp, flash, catalog }, time) {
   if (kind === "server") {

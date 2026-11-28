@@ -1,14 +1,14 @@
-import { height, isWalkable, moveBody, nearFree, networkRacks, player, playerStart, supplySpots, width } from "./room.js";
+import { height, isWalkable, moveBody, nearFree, networkRacks, player, playerStart, supplySpots, tokenComputer, tokenSpots, width } from "./room.js";
 import { createHostileFire } from "./hostile-fire.js";
 import { clearPath, makeField, nearestCell, pursue, walkOut } from "./navigation.js";
 import { createVisitors } from "./visitors.js";
 import { createWeapons, weapons } from "./weapons.js";
 
 const robotTypes = {
-  spider: { name: "Паук Ubuntu", radius: 5, meleeReach: 19, eye: 8, maxHp: 1100, speed: 88, damage: 24, color: "#ff947a", phase: 1, coins: 45 },
-  walker: { name: "Робот ALT Linux", radius: 6, eye: 21, maxHp: 1920, speed: 70, damage: 38, color: "#f6c786", phase: 1, coins: 65 },
-  swarm: { name: "ИИ-агент", radius: 3, meleeReach: 14, eye: 4, maxHp: 440, speed: 87, damage: 12, color: "#e6ac76", coins: 8 },
-  agent: { radius: 6, meleeReach: 24, eye: 13, maxHp: 1440, speed: 74, damage: 25, coins: 32 },
+  spider: { name: "Паук Ubuntu", radius: 5, meleeReach: 19, eye: 8, maxHp: 1100, speed: 88, damage: 24, color: "#ff947a", phase: 1, coins: 23, tokens: 22 },
+  walker: { name: "Робот ALT Linux", radius: 6, eye: 21, maxHp: 1920, speed: 70, damage: 38, color: "#f6c786", phase: 1, coins: 33, tokens: 32 },
+  swarm: { name: "ИИ-агент", radius: 3, meleeReach: 14, eye: 4, maxHp: 440, speed: 87, damage: 12, color: "#e6ac76", coins: 4, tokens: 4 },
+  agent: { radius: 6, meleeReach: 24, eye: 13, maxHp: 1440, speed: 74, damage: 25, coins: 16, tokens: 16 },
   furry: { name: "Фурри", radius: 6, eye: 17, maxHp: 500, speed: 98, damage: 28, color: "#a8c8ff", coins: 18 },
 };
 
@@ -23,7 +23,7 @@ const allyGift = 8;
 const outfitDuration = 30;
 const rackRepairTime = 0.85;
 const serverHp = 150;
-const serverCoins = 10;
+const serverTokens = 10;
 export const medkits = [
   { hp: 10, cost: 5 },
   { hp: 25, cost: 10 },
@@ -63,8 +63,9 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     time: 0, aim: { x: player.x, y: player.y - 48, visible: false },
     robots: [], particles: [], shocks: [], shots: [], projectiles: [], pending: [], visitors: [], handshake: null, allies: [],
     hostileBullets: [], hostileRockets: [],
-    coins: 0, coinDrops: [],
-    servers: networkRacks.map(rack => ({ ...rack, hp: serverHp, maxHp: serverHp, eye: 9, color: "#80aba5", coins: serverCoins })),
+    coins: 0, tokens: 0, tokenComputerUsed: false,
+    currencyDrops: tokenSpots.map(spot => ({ ...spot, currency: "tokens", fromX: spot.x, fromY: spot.y, landedAt: 0 })),
+    servers: networkRacks.map(rack => ({ ...rack, hp: serverHp, maxHp: serverHp, eye: 9, color: "#80aba5", tokensDropped: 0 })),
     supplies: supplySpots.map(spot => {
       if (!spot.weaponId) return { ...spot };
       const index = weapons.findIndex(weapon => weapon.id === spot.weaponId);
@@ -78,7 +79,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
   };
   let reviveIn = 0;
   let conversionUsed = false;
-  const arsenal = createWeapons(state, player, burst, shock, damageAlly, dropCoins);
+  const arsenal = createWeapons(state, player, burst, shock, damageAlly, dropRobotLoot, dropServerTokens);
   const hostileFire = createHostileFire(state, player, hitPlayer, burst, shock);
   let playerCell = -1;
   let playerField;
@@ -102,27 +103,60 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     state.shocks.push({ x, y, radius, color, life: duration, total: duration });
   }
 
-  function dropCoins({ x, y, coins }) {
-    if (!coins) return;
-    const count = Math.min(4, Math.ceil(coins / 8));
-    const rotation = Math.random() * Math.PI * 2;
+  function dropCurrency({ x, y }, currency, amount, rotation = Math.random() * Math.PI * 2) {
+    const count = Math.min(4, Math.ceil(amount / 8));
     for (let index = 0; index < count; index++) {
       const angle = rotation + index * Math.PI * 2 / count;
       const point = nearFree(x + Math.cos(angle) * 22, y + Math.sin(angle) * 17, 5) ?? nearFree(x, y, 5);
       if (!point) continue;
-      const value = Math.floor(coins / count) + (index < coins % count ? 1 : 0);
-      state.coinDrops.push({ ...point, fromX: x, fromY: y, value, landedAt: state.time + 0.25 });
+      const value = Math.floor(amount / count) + (index < amount % count ? 1 : 0);
+      state.currencyDrops.push({ ...point, currency, fromX: x, fromY: y, value, landedAt: state.time + 0.25 });
     }
   }
 
-  function collectCoins() {
-    let pickedUp = 0;
-    state.coinDrops = state.coinDrops.filter(coin => {
-      if (state.time < coin.landedAt || Math.hypot(player.x - coin.x, player.y - coin.y) > 15) return true;
-      pickedUp += coin.value;
+  function dropRobotLoot(robot) {
+    const rotation = Math.random() * Math.PI * 2;
+    if (robot.coins) dropCurrency(robot, "coins", robot.coins, rotation);
+    if (robot.tokens) dropCurrency(robot, "tokens", robot.tokens, rotation + Math.PI / 4);
+  }
+
+  function dropServerTokens(server) {
+    const total = Math.ceil(serverTokens * (server.maxHp - server.hp) / server.maxHp);
+    const gained = total - server.tokensDropped;
+    if (gained <= 0) return;
+    server.tokensDropped = total;
+    dropCurrency(server, "tokens", gained);
+  }
+
+  function collectCurrency() {
+    state.currencyDrops = state.currencyDrops.filter(drop => {
+      if (state.time < drop.landedAt || Math.hypot(player.x - drop.x, player.y - drop.y) > 15) return true;
+      state[drop.currency] += drop.value;
       return false;
     });
-    state.coins += pickedUp;
+  }
+
+  function activateTokenComputer() {
+    if (state.tokenComputerUsed || state.dead) return;
+    const { x, y, cost } = tokenComputer;
+    if (state.tokens < cost) {
+      onNotice("Для запуска нужно ещё " + (cost - state.tokens) + " токенов");
+      return;
+    }
+    const point = nearFree(x, y + 29, 6);
+    if (!point) return;
+
+    state.tokens -= cost;
+    state.tokenComputerUsed = true;
+    const hp = robotTypes.agent.maxHp;
+    state.allies.push({
+      ...point, kind: "crutch", name: "Робот из костылей", color: allyColor, radius: 6, hp, maxHp: hp,
+      stride: 0, phase: "guard", side: -1, nextAttack: state.time,
+    });
+    state.coins += allyGift;
+    shock(x, y - 9, 44, "#c6a6fa", 0.45);
+    burst(x, y - 13, ["#d4bcff", "#b597e5", "#91e6b2"], 46, 119);
+    onNotice("Робот из костылей пришёл на помощь · +" + allyGift + " монет");
   }
 
   const opsec = {
@@ -613,13 +647,13 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
       return false;
     }
     collectNearbySupplies();
-    collectCoins();
+    collectCurrency();
     if (state.robots.length) advanceRobots(elapsed);
     return false;
   }
 
   return {
-    state, opsec, trigger, startCelebration, update, ammoOffer, buyAmmo, medkitOffer, buyMedkit,
+    state, opsec, trigger, startCelebration, update, activateTokenComputer, ammoOffer, buyAmmo, medkitOffer, buyMedkit,
     cycleWeapon: arsenal.cycle, selectWeapon: arsenal.select,
   };
 }

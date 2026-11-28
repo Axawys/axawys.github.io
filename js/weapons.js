@@ -85,7 +85,7 @@ export function wallDistance(x, y, dx, dy, range, ignoredObstacle) {
   return range;
 }
 
-export function createWeapons(state, player, burst, shock, damageAlly = () => {}, onDestroyed = () => {}) {
+export function createWeapons(state, player, burst, shock, damageAlly = () => {}, onDestroyed = () => {}, onServerDamaged = () => {}) {
   const owned = weapons.map(weapon => weapon.id === "pistol");
   const ammo = weapons.map((weapon, index) => owned[index] ? weapon.capacity : 0);
   let selected = 0;
@@ -147,13 +147,13 @@ export function createWeapons(state, player, burst, shock, damageAlly = () => {}
     server.hp = Math.max(0, server.hp - damage);
     server.flash = state.time + 0.12;
     burst(x, y, ["#ffe2a5", "#91b6a7"], 6, 73);
+    onServerDamaged(server);
     if (server.hp > 0) return;
 
     delete server.burn;
     shock(server.x, server.y, 24, "#ffba85", 0.32);
     burst(server.x, server.y - 9, ["#ffbf76", "#687f75", "#cf8662"], 26, 94);
     burst(server.x, server.y - 6, ["#64736a", "#3b4941"], 8, 45, true);
-    onDestroyed(server);
   }
 
   function damageRocket(rocket, damage) {

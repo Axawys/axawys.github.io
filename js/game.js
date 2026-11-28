@@ -22,6 +22,7 @@ const hintCopyStatus = byId("hint-copy-status");
 const health = byId("health");
 const armor = byId("armor");
 const coins = byId("coins");
+const tokens = byId("tokens");
 const death = byId("death");
 const weaponSlots = byId("weapon-slots");
 const allyTimers = byId("ally-timers");
@@ -192,12 +193,13 @@ function gamePaused() {
 
 function interact() {
   if (action.state.dead || gamePaused()) return false;
-  const target = nearestInteraction(notes);
+  const target = nearestInteraction(notes, action.state.tokenComputerUsed);
   if (!target) return false;
 
   resetInput();
   if (target.kind === "note") openNote(target);
   else if (target.kind === "kiosk") shop.open(target.catalog);
+  else if (target.kind === "token-pc") action.activateTokenComputer();
   else terminal.open(target);
   return true;
 }
@@ -241,21 +243,25 @@ function resetInput() {
 }
 
 function updateInteraction(paused) {
-  const target = paused || action.state.dead ? undefined : nearestInteraction(notes);
+  const target = paused || action.state.dead ? undefined : nearestInteraction(notes, action.state.tokenComputerUsed);
+  const below = target?.kind === "note" || target?.kind === "kiosk" || target?.kind === "token-pc";
   if (target !== nearby) {
     nearby = target;
     interactButton.hidden = !target;
     if (target?.kind === "kiosk") {
       interactText.textContent = target.catalog === "medkits" ? "Купить аптечку" : "Купить боеприпасы";
-    } else {
+    } else if (target?.kind !== "token-pc") {
       interactText.textContent = target?.task ? "Читать подсказку" : target === note ? "Читать записку" : "Сесть за ПК";
     }
-    interactButton.classList.toggle("below", target?.kind === "note" || target?.kind === "kiosk");
+    interactButton.classList.toggle("below", below);
   }
   if (!target) return;
 
-  const below = target.kind === "note" || target.kind === "kiosk";
-  const offset = target.kind === "kiosk" ? 15 : below ? 8 : -32;
+  if (target.kind === "token-pc") {
+    const text = action.state.tokens < target.cost ? "Нужно " + target.cost + " токенов" : "Собрать союзника";
+    if (interactText.textContent !== text) interactText.textContent = text;
+  }
+  const offset = target.kind === "token-pc" ? 21 : target.kind === "kiosk" ? 15 : below ? 8 : -32;
   const point = renderer.screenPoint(target.x, target.y + offset);
   const half = interactButton.offsetWidth / 2 + 5;
   const buttonHeight = interactButton.offsetHeight;
@@ -458,6 +464,7 @@ function frame(time) {
   if (health.value !== String(player.hp)) health.value = String(player.hp);
   if (armor.value !== String(player.armor)) armor.value = String(player.armor);
   if (coins.value !== String(action.state.coins)) coins.value = String(action.state.coins);
+  if (tokens.value !== String(action.state.tokens)) tokens.value = String(action.state.tokens);
   if (death.hidden === action.state.dead) death.hidden = !action.state.dead;
   while (activeNotices[0]?.expires <= action.state.time) activeNotices.shift().element.remove();
   canvas.classList.toggle("armed", action.state.armed);
