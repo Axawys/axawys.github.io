@@ -23,7 +23,10 @@
     <p id="death" role="status" hidden>Вы погибли</p>
     <div id="weapon-slots" class="weapon-slots" role="group" aria-label="Выбор оружия" hidden></div>
     <div id="event-notices" class="event-notices" role="log" aria-label="События в офисе"></div>
-    <div id="ally-timers" class="ally-timers" hidden></div>
+    <div class="field-status">
+      <div class="coin-wallet"><i class="coin-icon" aria-hidden="true"></i><output id="coins" aria-label="Монеты">0</output></div>
+      <div id="ally-timers" class="ally-timers" hidden></div>
+    </div>
     <div id="achievement-notice" class="achievement-notice" role="status"></div>
     <output id="health" class="visually-hidden" aria-label="Здоровье">100</output>
     <output id="armor" class="visually-hidden" aria-label="Броня">0</output>
@@ -38,15 +41,15 @@
         <dd class="guide-touch">Коснитесь левой половины карты и сдвиньте палец, чтобы двигаться.</dd>
       </div>
       <div>
-        <dt>Записки и ПК</dt>
-        <dd class="guide-keyboard"><kbd>E</kbd> — взаимодействовать и закрывать записки, <kbd>Esc</kbd> — встать из-за ПК.</dd>
-        <dd class="guide-touch">Подойдите к записке или ПК и коснитесь появившейся подсказки.</dd>
+        <dt>Взаимодействие</dt>
+        <dd class="guide-keyboard"><kbd>E</kbd> — взаимодействовать и закрывать записки, <kbd>Esc</kbd> — выйти из окна.</dd>
+        <dd class="guide-touch">Подойдите к записке, ПК или киоску и коснитесь появившейся подсказки.</dd>
       </div>
       <div>
         <dt>Оружие</dt>
         <dd class="guide-keyboard"><kbd>ЛКМ</kbd> — стрелять. Меняйте оружие на <kbd>1–6</kbd>, колёсиком или нажатием на слот.</dd>
         <dd class="guide-touch">Коснитесь правой половины карты и сдвиньте палец, чтобы прицеливаться и стрелять. Выбирайте оружие нажатием на слот.</dd>
-        <dd>Стрельба и слоты открываются после появления первого врага. Оружие, боеприпасы, броня и аптечки подбираются на ходу.</dd>
+        <dd>Стрельба и слоты открываются после появления первого врага. Предметы и монеты подбираются на ходу. Киоск с боеприпасами находится в центре офиса.</dd>
       </div>
       <div>
         <dt>Достижения</dt>
@@ -83,6 +86,16 @@
       <button type="submit" autofocus>Отмена</button>
       <button type="button" id="confirm-reset-progress" class="danger-button">Сбросить</button>
     </form>
+  </dialog>
+
+  <dialog id="ammo-shop" class="ammo-shop" aria-labelledby="shop-title">
+    <header>
+      <h2 id="shop-title">Киоск боеприпасов</h2>
+      <button id="shop-close" type="button" autofocus>Закрыть</button>
+    </header>
+    <div class="shop-wallet"><i class="coin-icon" aria-hidden="true"></i> Монеты <output id="shop-coins">0</output></div>
+    <ul id="shop-offers" class="shop-offers"></ul>
+    <p id="shop-status" class="shop-status" role="status"></p>
   </dialog>
 
   <dialog id="note" class="note" aria-labelledby="note-title">

@@ -1,6 +1,6 @@
 import { label } from "./pixel-font.js";
 import { box } from "./pixels.js";
-import { drawAlly, drawBlastZones, drawBurningRobot, drawEffects, drawPlayer, drawRobot, drawRobotTags, drawSupply, drawVisitor, drawWeapon } from "./sprites.js";
+import { drawAlly, drawBlastZones, drawBurningRobot, drawCoinDrop, drawEffects, drawPlayer, drawRobot, drawRobotTags, drawSupply, drawVisitor, drawWeapon } from "./sprites.js";
 
 export const width = 1220;
 export const height = 966;
@@ -62,6 +62,10 @@ function item(kind, x, y, box) {
   return { kind, x, y, box: box.map((side, index) => side + (index % 2 ? y : x)) };
 }
 
+export const ammoKiosk = item("kiosk", 654, 500, [-23, -7, 23, 12]);
+export const networkRacks = [[1029, 148], [1061, 148], [1093, 148], [1125, 148], [1111, 201], [1143, 201]]
+  .map(([x, y]) => item("server", x, y, [-13, -13, 13, 15]));
+
 const furniture = [
   // Archives and supply storage.
   item("shelf", 91, 130, [-34, -7, 34, 18]),
@@ -77,12 +81,7 @@ const furniture = [
   item("plant", 198, 352, [-7, -2, 7, 7]),
 
   // Server racks and maintenance benches.
-  item("rack", 1029, 148, [-13, -13, 13, 15]),
-  item("rack", 1061, 148, [-13, -13, 13, 15]),
-  item("rack", 1093, 148, [-13, -13, 13, 15]),
-  item("rack", 1125, 148, [-13, -13, 13, 15]),
-  item("rack", 1111, 201, [-13, -13, 13, 15]),
-  item("rack", 1143, 201, [-13, -13, 13, 15]),
+  ...networkRacks,
   item("crate", 1012, 210, [-10, -5, 12, 10]),
   item("table", 1038, 383, [-27, -10, 27, 17]),
   item("table", 1126, 383, [-27, -10, 27, 17]),
@@ -106,6 +105,7 @@ const furniture = [
   item("crate", 1154, door.y - 49, [-10, -5, 12, 10]),
   item("plant", 553, door.y - 28, [-7, -2, 7, 7]),
   item("plant", 667, door.y - 28, [-7, -2, 7, 7]),
+  ammoKiosk,
 ];
 
 const obstacles = [
@@ -117,14 +117,18 @@ const obstacles = [
 ];
 
 const fixedLayers = [
-  ...furniture.map(prop => ({ depth: prop.box[3], draw: (ctx, time) => drawFurniture(ctx, prop, time) })),
+  ...furniture.filter(prop => prop.kind !== "server")
+    .map(prop => ({ depth: prop.box[3], draw: (ctx, time) => drawFurniture(ctx, prop, time) })),
 ];
 
-export function isWalkable(x, y, radius = 4) {
+export function isWalkable(x, y, radius = 4, ignoredObstacle) {
   return x - radius >= floor.left && x + radius <= floor.right
     && y - radius >= floor.top && y + radius <= floor.bottom
-    && !obstacles.some(([left, top, right, bottom]) =>
-      x + radius > left && x - radius < right && y + radius > top && y - radius < bottom);
+    && !obstacles.some(bounds => {
+      if (bounds === ignoredObstacle) return false;
+      const [left, top, right, bottom] = bounds;
+      return x + radius > left && x - radius < right && y + radius > top && y - radius < bottom;
+    });
 }
 
 export function moveBody(body, dx, dy) {
@@ -147,6 +151,8 @@ export function movePlayer(dx, dy, elapsed) {
 
 export function nearestInteraction(notes) {
   return notes.find(note => Math.hypot(player.x - note.x, player.y - note.y) < 23)
+    ?? (Math.abs(player.x - ammoKiosk.x) <= 27 && player.y >= ammoKiosk.y + 13 && player.y <= ammoKiosk.y + 36
+      ? ammoKiosk : undefined)
     ?? stations.find(station => !station.offline && !station.busy && Math.abs(player.x - station.x) <= 29
     && player.y >= station.y + 20 && player.y <= station.y + 53);
 }
@@ -220,6 +226,11 @@ export function createRenderer(canvas) {
     }
     for (const note of notes) layers.push({ depth: note.y, draw: () => drawNote(context, note, nearby === note) });
     for (const supply of action.supplies) layers.push({ depth: supply.y, draw: () => drawSupply(context, supply) });
+    for (const coin of action.coinDrops) layers.push({ depth: coin.y, draw: () => drawCoinDrop(context, coin, time) });
+    for (const server of action.servers) layers.push({ depth: server.box[3], draw: () => {
+      drawFurniture(context, server, time * 1000);
+      drawBurningRobot(context, server, time);
+    } });
     for (const robot of action.robots) layers.push({ depth: robot.y, draw: () => {
       if (robot.reviveAt) context.globalAlpha = 0.58;
       drawRobot(context, robot, time);
@@ -440,11 +451,19 @@ function drawDesk(ctx, { number, id, x, y, screen, offline }, near, discovered, 
 }
 
 
-function drawFurniture(ctx, { x, y, kind, box: bounds }, time) {
-  if (kind === "rack") {
+function drawFurniture(ctx, { x, y, kind, box: bounds, hp, maxHp, flash }, time) {
+  if (kind === "server") {
     box(ctx, "#14281fb5", x - 11, y + 5, 25, 13);
+    if (hp === 0) {
+      box(ctx, "#242f2c", x - 12, y - 6, 24, 20);
+      box(ctx, "#56675d", x - 11, y - 5, 5, 17);
+      box(ctx, "#151d19", x - 6, y + 4, 13, 9);
+      box(ctx, "#73544b", x + 3, y + 1, 8, 3);
+      box(ctx, "#926450", x + 7, y - 2, 3, 4);
+      return;
+    }
     box(ctx, "#3a5548", x - 11, y - 20, 22, 35);
-    box(ctx, "#688173", x - 11, y - 20, 22, 4);
+    box(ctx, time < flash * 1000 ? "#f6d6a9" : "#688173", x - 11, y - 20, 22, 4);
     box(ctx, "#162923", x - 9, y - 14, 18, 26);
     for (let slot = 0; slot < 6; slot++) {
       const row = y - 13 + slot * 4;
@@ -452,6 +471,27 @@ function drawFurniture(ctx, { x, y, kind, box: bounds }, time) {
       box(ctx, "#21372c", x - 6, row + 1, 7, 1);
       box(ctx, (time + slot * 351) % 1700 < 1000 ? "#a6deac" : "#526d5a", x + 5, row + 1, 1, 1);
     }
+    if (hp < maxHp) {
+      box(ctx, "#2c2521", x - 11, y - 29, 22, 4);
+      box(ctx, "#e99a7e", x - 10, y - 28, Math.ceil(20 * hp / maxHp), 2);
+    }
+    return;
+  }
+  if (kind === "kiosk") {
+    box(ctx, "#152820b0", x - 25, y + 7, 52, 8);
+    box(ctx, "#281f1b", x - 23, y - 23, 46, 35);
+    box(ctx, "#7f6844", x - 21, y - 20, 42, 29);
+    box(ctx, "#b8965e", x - 21, y - 21, 42, 4);
+    box(ctx, "#253930", x - 17, y - 13, 23, 15);
+    for (const offset of [-13, -7, -1]) {
+      box(ctx, "#d0ae70", x + offset, y - 9, 3, 7);
+      box(ctx, "#f6d083", x + offset + 1, y - 10, 1, 2);
+    }
+    box(ctx, "#352d21", x + 10, y - 12, 7, 13);
+    box(ctx, "#eabd65", x + 12, y - 10, 3, 2);
+    box(ctx, "#151e18", x - 15, y + 4, 28, 3);
+    box(ctx, "#3a3223", x - 24, y - 30, 48, 11);
+    label(ctx, "ПАТРОНЫ", x, y - 28, "#f2d893");
     return;
   }
   if (kind === "partition") {

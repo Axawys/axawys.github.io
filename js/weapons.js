@@ -3,10 +3,10 @@ import { isWalkable } from "./room.js";
 
 export const weapons = [
   { id: "pistol", kind: "bullet", name: "Пистолет", capacity: Infinity, length: 8, thickness: 2, color: "#d8d6bd", range: 430, damage: 38, cooldown: 0.26 },
-  { id: "launcher", kind: "rocket", name: "Гранатомёт", capacity: 20, length: 18, thickness: 5, color: "#d7a67d", range: 320, radius: 44, damage: 108, cooldown: 0.7 },
-  { id: "grenade", kind: "grenade", name: "Гранаты", capacity: 6, length: 7, color: "#aaca88", range: 155, radius: 55, damage: 128, cooldown: 0.78 },
-  { id: "flame", kind: "flame", name: "Огнемёт", capacity: 40, length: 15, thickness: 4, color: "#f9b06e", range: 96, damage: 12, cooldown: 0.09, automatic: true },
-  { id: "rifle", kind: "bullet", name: "Автомат", capacity: 50, length: 13, thickness: 3, color: "#a8b7a5", range: 560, damage: 24, cooldown: 0.105, automatic: true },
+  { id: "launcher", kind: "rocket", name: "Гранатомёт", capacity: 20, length: 18, thickness: 5, color: "#d7a67d", range: 320, radius: 44, damage: 108, cooldown: 0.7, shop: { rounds: 3, cost: 12 } },
+  { id: "grenade", kind: "grenade", name: "Гранаты", capacity: 6, length: 7, color: "#aaca88", range: 155, radius: 55, damage: 128, cooldown: 0.78, shop: { rounds: 2, cost: 12 } },
+  { id: "flame", kind: "flame", name: "Огнемёт", capacity: 40, length: 15, thickness: 4, color: "#f9b06e", range: 96, damage: 12, cooldown: 0.09, automatic: true, shop: { rounds: 12, cost: 10 } },
+  { id: "rifle", kind: "bullet", name: "Автомат", capacity: 50, length: 13, thickness: 3, color: "#a8b7a5", range: 560, damage: 24, cooldown: 0.105, automatic: true, shop: { rounds: 20, cost: 12 } },
   { id: "bfg", kind: "rocket", name: "BFG", capacity: 1, refillable: false, length: 21, thickness: 6, color: "#9aee8f", range: 440, radius: 150, damage: 10000, cooldown: 0.9 },
 ];
 
@@ -24,6 +24,7 @@ const hitboxes = {
   agent: [[-25, -27, 25, 7]],
   furry: [[-11, -37, 11, 3], [5, -22, 22, 1]],
   homingRocket: [[-8, -7, 8, 7]],
+  server: [[-13, -22, 13, 15]],
 };
 
 export function traceHitbox({ dx, dy }, left, top, right, bottom, range) {
@@ -74,16 +75,16 @@ function flameOverlaps({ dx, dy }, left, top, right, bottom, range) {
   return true;
 }
 
-export function wallDistance(x, y, dx, dy, range) {
+export function wallDistance(x, y, dx, dy, range, ignoredObstacle) {
   const steps = Math.max(1, Math.ceil(range / 3));
   const step = range / steps;
   for (let i = 1; i <= steps; i++) {
-    if (!isWalkable(x + dx * step * i, y + dy * step * i, 0)) return step * (i - 1);
+    if (!isWalkable(x + dx * step * i, y + dy * step * i, 0, ignoredObstacle)) return step * (i - 1);
   }
   return range;
 }
 
-export function createWeapons(state, player, burst, shock, damageAlly = () => {}) {
+export function createWeapons(state, player, burst, shock, damageAlly = () => {}, onDestroyed = () => {}) {
   const owned = weapons.map(weapon => weapon.id === "pistol");
   const ammo = weapons.map((weapon, index) => owned[index] ? weapon.capacity : 0);
   let selected = 0;
@@ -137,6 +138,21 @@ export function createWeapons(state, player, burst, shock, damageAlly = () => {}
     state.robots.splice(state.robots.indexOf(robot), 1);
     shock(robot.x, robot.y - 3, 22, robot.color, 0.22);
     burst(robot.x, robot.y - robot.eye, ["#d9c491", "#f5a46b", "#687e72"], 16, 95);
+    onDestroyed(robot);
+  }
+
+  function damageServer(server, damage, x, y) {
+    if (server.hp <= 0) return;
+    server.hp = Math.max(0, server.hp - damage);
+    server.flash = state.time + 0.12;
+    burst(x, y, ["#ffe2a5", "#91b6a7"], 6, 73);
+    if (server.hp > 0) return;
+
+    delete server.burn;
+    shock(server.x, server.y, 24, "#ffba85", 0.32);
+    burst(server.x, server.y - 9, ["#ffbf76", "#687f75", "#cf8662"], 26, 94);
+    burst(server.x, server.y - 6, ["#64736a", "#3b4941"], 8, 45, true);
+    onDestroyed(server);
   }
 
   function damageRocket(rocket, damage) {
@@ -153,14 +169,15 @@ export function createWeapons(state, player, burst, shock, damageAlly = () => {}
 
   function damageTarget(target, damage, x, y, options) {
     if (target.kind === "homingRocket") damageRocket(target, damage);
+    else if (target.kind === "server") damageServer(target, damage, x, y);
     else damageRobot(target, damage, x, y, options);
   }
 
   function damageableTargets() {
-    return [...state.robots, ...(state.hostileRockets ?? [])];
+    return [...state.robots, ...(state.hostileRockets ?? []), ...(state.servers ?? []).filter(server => server.hp > 0)];
   }
 
-  function firstTarget(ray, range, includeDowned = false) {
+  function firstTarget(ray, range, wallLimit, includeDowned = false) {
     let result = null;
     for (const target of damageableTargets()) {
       if (target.reviveAt && !includeDowned) continue;
@@ -169,6 +186,8 @@ export function createWeapons(state, player, burst, shock, damageAlly = () => {}
       for (const [left, top, right, bottom] of hitboxes[target.kind]) {
         const distance = traceHitbox(ray, x + left, y + top, x + right, y + bottom, range);
         if (distance === null || (result && distance >= range)) continue;
+        if (distance > wallLimit && (target.kind !== "server"
+          || wallDistance(ray.x, ray.y + 9, ray.dx, ray.dy, distance, target.box) < distance)) continue;
         result = { target, distance };
         range = distance;
       }
@@ -179,7 +198,7 @@ export function createWeapons(state, player, burst, shock, damageAlly = () => {}
   function fireBullet(ray, weapon) {
     const { x, y, dx, dy } = ray;
     const limit = wallDistance(x, y + 9, dx, dy, weapon.range);
-    const impact = firstTarget(ray, limit);
+    const impact = firstTarget(ray, weapon.range, limit);
     const distance = impact?.distance ?? limit;
     const endX = x + dx * distance;
     const endY = y + dy * distance;
@@ -209,7 +228,7 @@ export function createWeapons(state, player, burst, shock, damageAlly = () => {}
       const dy = target.y + (target.kind === "homingRocket" ? 9 : 0) - y;
       const distance = Math.hypot(dx, dy);
       if (distance > weapon.radius) continue;
-      if (!bfg && distance > 1 && wallDistance(x, y, dx / distance, dy / distance, distance) < distance) continue;
+      if (!bfg && distance > 1 && wallDistance(x, y, dx / distance, dy / distance, distance, target.box) < distance) continue;
       const damage = bfg ? weapon.damage : Math.round(weapon.damage * (1 - distance / weapon.radius * 0.48));
       damageTarget(target, damage, target.x, target.y - target.eye, { finish: bfg });
     }
@@ -222,7 +241,7 @@ export function createWeapons(state, player, burst, shock, damageAlly = () => {}
 
   function launchRocket(ray, weapon) {
     const clear = wallDistance(ray.x, ray.y + 9, ray.dx, ray.dy, weapon.length);
-    const near = firstTarget(ray, clear, weapon.id === "bfg");
+    const near = firstTarget(ray, weapon.length, clear, weapon.id === "bfg");
     if (near || clear < weapon.length) {
       const distance = near?.distance ?? clear;
       explode(ray.x + ray.dx * distance, ray.y + ray.dy * distance + 9, weapon, near?.target);
@@ -279,7 +298,7 @@ export function createWeapons(state, player, burst, shock, damageAlly = () => {}
         flameOverlaps(ray, spriteX + left, spriteY + top, spriteX + right, spriteY + bottom, weapon.range))) continue;
       const groundY = target.y + (target.kind === "homingRocket" ? 9 : 0) - player.y;
       const distance = Math.hypot(vx, groundY);
-      if (distance > 1 && wallDistance(x, player.y, vx / distance, groundY / distance, distance) < distance) continue;
+      if (distance > 1 && wallDistance(x, player.y, vx / distance, groundY / distance, distance, target.box) < distance) continue;
       damageTarget(target, weapon.damage, target.x, target.y - target.eye);
       if (target.hp <= 0 || target.kind === "homingRocket") continue;
       target.burn ??= { nextTick: state.time + burnInterval };
@@ -288,12 +307,12 @@ export function createWeapons(state, player, burst, shock, damageAlly = () => {}
   }
 
   function advanceBurns() {
-    for (const robot of [...state.robots]) {
+    for (const robot of damageableTargets()) {
       const burn = robot.burn;
       if (!burn) continue;
       const end = Math.min(state.time, burn.until);
       while (burn.nextTick <= end + 1e-9 && robot.hp > 0) {
-        damageRobot(robot, burnDamage, robot.x, robot.y - robot.eye, { colors: ["#ffd68a", "#ee7541"] });
+        damageTarget(robot, burnDamage, robot.x, robot.y - robot.eye, { colors: ["#ffd68a", "#ee7541"] });
         burn.nextTick += burnInterval;
       }
       if (state.time >= burn.until) delete robot.burn;
@@ -316,7 +335,7 @@ export function createWeapons(state, player, burst, shock, damageAlly = () => {}
     const { x, y, dx, dy } = projectile;
     const step = Math.min(projectile.remaining, elapsed * 305);
     const clear = wallDistance(x, y + 9, dx, dy, step);
-    const impact = firstTarget(projectile, clear, weapon.id === "bfg");
+    const impact = firstTarget(projectile, step, clear, weapon.id === "bfg");
     const travel = impact?.distance ?? clear;
     projectile.x += dx * travel;
     projectile.y += dy * travel;
@@ -345,5 +364,5 @@ export function createWeapons(state, player, burst, shock, damageAlly = () => {}
     cooldown = weapon.cooldown;
   }
 
-  return { ammo, owned, collect, cycle, damageRobot, damageRocket, refill, select, update, get equipped() { return weapons[selected]; } };
+  return { ammo, owned, collect, cycle, damageRobot, damageRocket, damageServer, refill, select, update, get equipped() { return weapons[selected]; } };
 }

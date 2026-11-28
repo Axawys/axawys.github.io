@@ -1,14 +1,14 @@
-import { door, height, isWalkable, moveBody, player, playerStart, supplySpots, width } from "./room.js";
+import { door, height, isWalkable, moveBody, networkRacks, player, playerStart, supplySpots, width } from "./room.js";
 import { createHostileFire } from "./hostile-fire.js";
 import { clearPath, makeField, nearestCell, pursue } from "./navigation.js";
 import { createWeapons, weapons } from "./weapons.js";
 
 const robotTypes = {
-  spider: { name: "Паук Ubuntu", radius: 5, eye: 8, maxHp: 1100, speed: 88, damage: 24, color: "#ff947a", phase: 1 },
-  walker: { name: "Робот ALT Linux", radius: 6, eye: 21, maxHp: 1920, speed: 70, damage: 38, color: "#f6c786", phase: 1 },
-  swarm: { name: "ИИ-агент", radius: 3, eye: 4, maxHp: 440, speed: 87, damage: 12, color: "#e6ac76" },
-  agent: { radius: 6, eye: 13, maxHp: 1440, speed: 74, damage: 25 },
-  furry: { name: "Фурри", radius: 6, eye: 17, maxHp: 500, speed: 98, damage: 28, color: "#a8c8ff" },
+  spider: { name: "Паук Ubuntu", radius: 5, eye: 8, maxHp: 1100, speed: 88, damage: 24, color: "#ff947a", phase: 1, coins: 45 },
+  walker: { name: "Робот ALT Linux", radius: 6, eye: 21, maxHp: 1920, speed: 70, damage: 38, color: "#f6c786", phase: 1, coins: 65 },
+  swarm: { name: "ИИ-агент", radius: 3, eye: 4, maxHp: 440, speed: 87, damage: 12, color: "#e6ac76", coins: 8 },
+  agent: { radius: 6, eye: 13, maxHp: 1440, speed: 74, damage: 25, coins: 32 },
+  furry: { name: "Фурри", radius: 6, eye: 17, maxHp: 500, speed: 98, damage: 28, color: "#a8c8ff", coins: 18 },
 };
 
 const gentooOverheat = 2;
@@ -18,6 +18,9 @@ const gentooMobDamage = 500;
 const allyDuration = 60;
 const allySpeed = 138;
 const allyColor = "#91e6b2";
+const allyGift = 8;
+const serverHp = 150;
+const serverCoins = 10;
 const allyTypes = {
   ally: { kind: "furry", name: "Фурри-союзник", maxHp: 500, side: 1 },
   gigacode: { kind: "agent", name: "gigacode", maxHp: robotTypes.agent.maxHp / 2, side: -1 },
@@ -61,6 +64,8 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     time: 0, aim: { x: player.x, y: player.y - 48, visible: false },
     robots: [], particles: [], shocks: [], shots: [], projectiles: [], pending: [], visitor: null, allies: [],
     hostileBullets: [], hostileRockets: [],
+    coins: 0, coinDrops: [],
+    servers: networkRacks.map(rack => ({ ...rack, hp: serverHp, maxHp: serverHp, eye: 9, color: "#80aba5", coins: serverCoins })),
     supplies: supplySpots.map(spot => {
       if (!spot.weaponId) return { ...spot };
       const index = weapons.findIndex(weapon => weapon.id === spot.weaponId);
@@ -73,7 +78,7 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
     get armed() { return weaponsUnlocked && !this.dead; },
   };
   let reviveIn = 0;
-  const arsenal = createWeapons(state, player, burst, shock, damageAlly);
+  const arsenal = createWeapons(state, player, burst, shock, damageAlly, dropCoins);
   const hostileFire = createHostileFire(state, player, hitPlayer, burst, shock);
   let playerCell = -1;
   let playerField;
@@ -96,6 +101,44 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
 
   function shock(x, y, radius, color, duration) {
     state.shocks.push({ x, y, radius, color, life: duration, total: duration });
+  }
+
+  function dropCoins({ x, y, coins }) {
+    if (!coins) return;
+    const count = Math.min(4, Math.ceil(coins / 8));
+    const rotation = Math.random() * Math.PI * 2;
+    for (let index = 0; index < count; index++) {
+      const angle = rotation + index * Math.PI * 2 / count;
+      const point = nearFree(x + Math.cos(angle) * 22, y + Math.sin(angle) * 17, 5) ?? nearFree(x, y, 5);
+      if (!point) continue;
+      const value = Math.floor(coins / count) + (index < coins % count ? 1 : 0);
+      state.coinDrops.push({ ...point, fromX: x, fromY: y, value, landedAt: state.time + 0.25 });
+    }
+  }
+
+  function collectCoins() {
+    let pickedUp = 0;
+    state.coinDrops = state.coinDrops.filter(coin => {
+      if (state.time < coin.landedAt || Math.hypot(player.x - coin.x, player.y - coin.y) > 15) return true;
+      pickedUp += coin.value;
+      return false;
+    });
+    state.coins += pickedUp;
+  }
+
+  function ammoOffer(index) {
+    const weapon = weapons[index];
+    if (!weapon?.shop) return null;
+    const rounds = Math.min(weapon.shop.rounds, weapon.capacity - arsenal.ammo[index]);
+    return { rounds, cost: Math.ceil(weapon.shop.cost * rounds / weapon.shop.rounds) };
+  }
+
+  function buyAmmo(index) {
+    const offer = ammoOffer(index);
+    if (!offer?.rounds || offer.cost > state.coins || state.dead) return null;
+    arsenal.collect(index, offer.rounds, false);
+    state.coins -= offer.cost;
+    return offer;
   }
 
   function hitPlayer(damage, { fatal = false, ignoreProtection = fatal, ignoreArmor = fatal } = {}) {
@@ -172,8 +215,9 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
         ...point, ...allyType, color: allyColor, radius: 6, hp: allyType.maxHp,
         stride: 0, phase: "guard", remaining: allyDuration, nextAttack: state.time,
       });
+      state.coins += allyGift;
       burst(point.x, point.y - 12, [allyColor, "#e0f8d8"], 16, 66);
-      onNotice(allyType.name + " пришёл на помощь");
+      onNotice(allyType.name + " пришёл на помощь · +" + allyGift + " монет");
       return;
     }
     if (event === "visitor" || event === "elder") {
@@ -210,6 +254,9 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
       }
       for (const rocket of [...state.hostileRockets]) {
         if (Math.hypot(rocket.x - blast.x, rocket.y + 9 - blast.y) <= blast.radius) arsenal.damageRocket(rocket, gentooMobDamage);
+      }
+      for (const server of state.servers) {
+        if (Math.hypot(server.x - blast.x, server.y - blast.y) <= blast.radius) arsenal.damageServer(server, gentooMobDamage, server.x, server.y - server.eye);
       }
       for (const ally of [...state.allies]) {
         if (Math.hypot(ally.x - blast.x, ally.y - blast.y) <= blast.radius) damageAlly(ally, gentooMobDamage);
@@ -551,9 +598,10 @@ export function createAction(onNotice = () => {}, onCelebrated = () => {}) {
       return false;
     }
     collectNearbySupplies();
+    collectCoins();
     if (state.robots.length) advanceRobots(elapsed);
     return false;
   }
 
-  return { state, trigger, startCelebration, update, cycleWeapon: arsenal.cycle, selectWeapon: arsenal.select };
+  return { state, trigger, startCelebration, update, ammoOffer, buyAmmo, cycleWeapon: arsenal.cycle, selectWeapon: arsenal.select };
 }

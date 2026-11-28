@@ -2,6 +2,7 @@ import { createAction } from "./action.js";
 import { createAchievements } from "./achievements.js";
 import { createJoystick } from "./joystick.js";
 import { createRenderer, movePlayer, nearestInteraction, noteSpots, player, stations } from "./room.js";
+import { createAmmoShop } from "./shop.js";
 import { drawWeaponIcon } from "./sprites.js";
 import { shuffleSystems } from "./systems.js";
 import { finaleAchievement, tasks } from "./tasks.js";
@@ -20,6 +21,7 @@ const hintCommands = byId("hint-command");
 const hintCopyStatus = byId("hint-copy-status");
 const health = byId("health");
 const armor = byId("armor");
+const coins = byId("coins");
 const death = byId("death");
 const weaponSlots = byId("weapon-slots");
 const allyTimers = byId("ally-timers");
@@ -41,6 +43,7 @@ const aimStick = createJoystick(canvas, byId("aim-joystick"), "right");
 const achievementTasks = tasks.filter(task => task.achievement);
 const achievements = createAchievements([...achievementTasks, finaleAchievement], () => canvas.focus({ preventScroll: true }));
 const action = createAction(showNotice, () => achievements.unlock(finaleAchievement));
+const shop = createAmmoShop(action, () => canvas.focus({ preventScroll: true }));
 action.state.medal = achievements.has(finaleAchievement.event);
 const terminal = createTerminal(stations, systems, (task, station, event) => {
   taskRows.get(task).classList.add("done");
@@ -179,7 +182,7 @@ let shotRequest;
 let interactionKeyHeld = false;
 
 function gamePaused() {
-  return controlsDialog.open || terminal.isOpen || noteDialog.open || achievements.isOpen;
+  return controlsDialog.open || terminal.isOpen || noteDialog.open || achievements.isOpen || shop.isOpen;
 }
 
 function interact() {
@@ -189,6 +192,7 @@ function interact() {
 
   resetInput();
   if (target.kind === "note") openNote(target);
+  else if (target.kind === "kiosk") shop.open();
   else terminal.open(target);
   return true;
 }
@@ -231,13 +235,15 @@ function updateInteraction(paused) {
   if (target !== nearby) {
     nearby = target;
     interactButton.hidden = !target;
-    interactText.textContent = target?.task ? "Читать подсказку" : target === note ? "Читать записку" : "Сесть за ПК";
-    interactButton.classList.toggle("below", target?.kind === "note");
+    interactText.textContent = target?.task ? "Читать подсказку" : target === note ? "Читать записку"
+      : target?.kind === "kiosk" ? "Купить боеприпасы" : "Сесть за ПК";
+    interactButton.classList.toggle("below", target?.kind === "note" || target?.kind === "kiosk");
   }
   if (!target) return;
 
-  const below = target.kind === "note";
-  const point = renderer.screenPoint(target.x, target.y + (below ? 8 : -32));
+  const below = target.kind === "note" || target.kind === "kiosk";
+  const offset = target.kind === "kiosk" ? 15 : below ? 8 : -32;
+  const point = renderer.screenPoint(target.x, target.y + offset);
   const half = interactButton.offsetWidth / 2 + 5;
   const buttonHeight = interactButton.offsetHeight;
   const minY = below ? 5 : buttonHeight + 5;
@@ -270,6 +276,7 @@ window.addEventListener("keydown", event => {
     return;
   }
   if (controlsDialog.open || event.altKey || event.ctrlKey || event.metaKey) return;
+  if (shop.isOpen) return;
   if (noteDialog.open) {
     if (event.code === "KeyE") {
       event.preventDefault();
@@ -433,6 +440,7 @@ function frame(time) {
   updateInteraction(paused);
   if (health.value !== String(player.hp)) health.value = String(player.hp);
   if (armor.value !== String(player.armor)) armor.value = String(player.armor);
+  if (coins.value !== String(action.state.coins)) coins.value = String(action.state.coins);
   if (death.hidden === action.state.dead) death.hidden = !action.state.dead;
   while (activeNotices[0]?.expires <= action.state.time) activeNotices.shift().element.remove();
   canvas.classList.toggle("armed", action.state.armed);

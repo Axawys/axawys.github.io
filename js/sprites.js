@@ -1,7 +1,7 @@
 import { label, textWidth } from "./pixel-font.js";
 import { box, gunRay, line, pixels } from "./pixels.js";
 
-const robotTopOffset = { swarm: 10, spider: 17, agent: 26, walker: 33, furry: 36, homingRocket: 7 };
+const robotTopOffset = { swarm: 10, spider: 17, agent: 26, walker: 33, furry: 36, homingRocket: 7, server: 20 };
 const weaponIcons = {
   pistol: [
     "....................",
@@ -121,6 +121,18 @@ export function drawSupply(ctx, { x, y, unlock, weapon, kind, amount }) {
     box(ctx, "#f7d593", x + offset, y - 8, 1, 2);
     box(ctx, "#835f38", x + offset - 1, y, 3, 1);
   }
+}
+
+export function drawCoinDrop(ctx, coin, time) {
+  const travel = Math.min(1, Math.max(0, 1 - (coin.landedAt - time) / 0.25));
+  const x = Math.round(coin.fromX + (coin.x - coin.fromX) * travel);
+  const ground = Math.round(coin.fromY + (coin.y - coin.fromY) * travel);
+  const y = ground - Math.round(11 * Math.sin(travel * Math.PI));
+  box(ctx, "#14241a", x - 5, ground + 2, 11, 3);
+  box(ctx, "#83531f", x - 4, y - 3, 9, 7);
+  box(ctx, "#e0ac48", x - 3, y - 4, 7, 7);
+  box(ctx, "#ffe39a", x - 2, y - 3, 5, 1);
+  box(ctx, "#9b6c30", x, y - 2, 1, 4);
 }
 
 function playerStatus(player, weapon) {
